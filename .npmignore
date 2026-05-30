@@ -1,21 +1,23 @@
+# Dependencies
 node_modules/
+
+# Git
 .git/
 .github/
+
+# Env & data
 .env
 *.db
 storage/
 .DS_Store
 *.tsbuildinfo
-tsconfig.json
-vitest.config.ts
 
-# Source files — only dist/ is needed
+# Config
+tsconfig.json
+
+# Source files (not needed — dist/ is published)
 *.ts
 !*.d.ts
-src/
-client/src/
-server/
-shared/
 
 # Dev files
 .prettierrc
