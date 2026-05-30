@@ -1,0 +1,29 @@
+[Unit]
+Description=Pages MCP Server
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+ExecStart=/usr/bin/npx -y github:ptbsare/pages-mcp-server server --port 3000 --domain http://localhost:3000 --admin-user admin --admin-pass changeme
+
+Environment=PORT=3000
+Environment=DOMAIN=http://localhost:3000
+Environment=ADMIN_USERNAME=admin
+Environment=ADMIN_PASSWORD=changeme
+Environment=DB_PATH=/root/.pages-mcp/pages.db
+Environment=STORAGE_PATH=/root/.pages-mcp/storage
+
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pages-mcp-server
+
+[Install]
+WantedBy=multi-user.target
