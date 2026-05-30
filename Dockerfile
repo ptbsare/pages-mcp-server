@@ -6,13 +6,14 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install ALL dependencies (including dev) so we can build
-RUN npm ci
+# --ignore-scripts: skip prepare/postinstall to avoid build during install
+RUN npm ci --ignore-scripts
 
-# Copy source
+# Copy source (including dist/ if pre-built)
 COPY . .
 
-# Build TypeScript
-RUN npm run build
+# Build TypeScript (production deps not needed for tsc)
+RUN npx tsc
 
 # Remove dev dependencies to reduce image size
 RUN npm prune --production

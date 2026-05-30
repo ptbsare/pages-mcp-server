@@ -25,6 +25,11 @@
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md"
+  ],
   "bin": {
     "pages-mcp": "./dist/cli.js"
   },
@@ -36,7 +41,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "prepare": "test -f dist/cli.js || npm run build",
+    "prepare": "npm run build",
     "dev:server": "tsx server/index.ts",
     "dev:client": "tsx client/src/cli.ts",
     "docker:build": "docker build -t pages-mcp-server .",
