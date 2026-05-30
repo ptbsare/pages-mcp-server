@@ -386,11 +386,13 @@ function getAdminHtml(config) {
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); transition: background 0.2s, color 0.2s; -webkit-text-size-adjust: 100%; }
 
     /* ─── Header ─────────────────────────────────────────── */
-    .header { background: var(--header-bg); color: white; padding: 16px 20px; }
-    .header-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-    .header h1 { font-size: 20px; font-weight: 700; }
-    .header p { opacity: 0.85; margin-top: 2px; font-size: 13px; }
-    .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .header { background: var(--header-bg); color: white; padding: 14px 16px; }
+    .header-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .header h1 { font-size: 18px; font-weight: 700; }
+    .header p { opacity: 0.85; margin-top: 2px; font-size: 12px; }
+    .header-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .header-left { min-width: 0; }
+    .header-left h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* ─── Container ──────────────────────────────────────── */
     .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
@@ -474,6 +476,21 @@ function getAdminHtml(config) {
 
     /* ─── Row actions ────────────────────────────────────── */
     .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .token-actions { text-align: right; }
+
+    /* ─── Hide on mobile ─────────────────────────────────── */
+    .hide-sm { display: none; }
+
+    /* ─── Footer ─────────────────────────────────────────── */
+    .footer { margin-top: 32px; padding: 24px 16px; border-top: 1px solid var(--border); text-align: center; }
+    .footer-inner { max-width: 1200px; margin: 0 auto; }
+    .footer-links { display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+    .footer-links a { color: var(--accent); text-decoration: none; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
+    .footer-links a:hover { text-decoration: underline; }
+    .footer-links .sep { color: var(--text4); font-size: 12px; }
+    .footer-desc { font-size: 12px; color: var(--text3); margin-bottom: 10px; line-height: 1.5; }
+    .footer-coffee { display: inline-flex; align-items: center; gap: 6px; background: var(--bg4); padding: 8px 16px; border-radius: 20px; font-size: 13px; color: var(--text); text-decoration: none; transition: filter 0.2s; }
+    .footer-coffee:hover { filter: brightness(0.92); text-decoration: none; }
 
     /* ─── Desktop ≥768px ─────────────────────────────────── */
     @media (min-width: 768px) {
@@ -495,22 +512,26 @@ function getAdminHtml(config) {
       .otp-secret { font-size: 14px; padding: 8px 12px; }
       .modal { padding: 32px; }
       .toast { left: auto; right: 24px; bottom: 24px; max-width: 400px; }
+      .hide-sm { display: table-cell; }
+      .token-actions { text-align: left; }
+      .footer { padding: 28px 24px; margin-top: 40px; }
+      .footer-links { gap: 20px; }
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <div>
-      <h1>🚀 Pages MCP Admin</h1>
-      <p>Manage your deployed static pages &amp; API tokens</p>
-    </div>
-    <div class="otp-status">
-      <span id="otpBadge"></span>
-      <button class="btn btn-primary" onclick="openOtpModal()">🔐 2FA</button>
-      <div style="display:flex;gap:4px;margin-left:8px;">
-        <button class="theme-btn" id="themeAuto" onclick="setTheme('auto')" title="Follow system">🌓 Auto</button>
-        <button class="theme-btn" id="themeLight" onclick="setTheme('light')" title="Light mode">☀️</button>
-        <button class="theme-btn" id="themeDark" onclick="setTheme('dark')" title="Dark mode">🌙</button>
+    <div class="header-row">
+      <div class="header-left">
+        <h1>🚀 Pages MCP Admin</h1>
+        <p>Manage deployed pages &amp; API tokens</p>
+      </div>
+      <div class="header-right">
+        <span id="otpBadge"></span>
+        <button class="btn btn-primary btn-sm" onclick="openOtpModal()">🔐 2FA</button>
+        <button class="theme-btn" id="themeAuto" onclick="setTheme('auto')" title="Auto">🌓</button>
+        <button class="theme-btn" id="themeLight" onclick="setTheme('light')" title="Light">☀️</button>
+        <button class="theme-btn" id="themeDark" onclick="setTheme('dark')" title="Dark">🌙</button>
       </div>
     </div>
   </div>
@@ -536,10 +557,27 @@ function getAdminHtml(config) {
     <div class="card">
       <div class="card-header"><h2>🔑 API Tokens</h2><button class="btn btn-primary" onclick="createToken()">+ New Token</button></div>
       <table>
-        <thead><tr><th>Name</th><th>Token</th><th>Created</th><th>Last Used</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Token</th><th>Created</th><th class="hide-sm">Last Used</th><th class="token-actions">Actions</th></tr></thead>
         <tbody id="tokenTable"></tbody>
       </table>
       <div class="empty" id="emptyTokens" style="display:none;">No API tokens yet. Create one to use the MCP / Deploy API.</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-inner">
+      <div class="footer-links">
+        <a href="https://github.com/ptbsare/pages-mcp-server/issues/new?template=bug_report.yml" target="_blank" rel="noopener">🐛 Report Bug</a>
+        <span class="sep">·</span>
+        <a href="https://github.com/ptbsare/pages-mcp-server/issues/new?template=feature_request.yml" target="_blank" rel="noopener">✨ Request Feature</a>
+        <span class="sep">·</span>
+        <a href="https://github.com/ptbsare/pages-mcp-server" target="_blank" rel="noopener">⭐ GitHub</a>
+        <span class="sep">·</span>
+        <a href="https://github.com/ptbsare" target="_blank" rel="noopener">👤 @ptbsare</a>
+      </div>
+      <p class="footer-desc">Pages MCP Server — Self-hosted MCP server for deploying static websites</p>
+      <a href="https://ptbsare.org/about/" target="_blank" rel="noopener" class="footer-coffee">☕ Buy me a coffee</a>
     </div>
   </div>
 
@@ -631,12 +669,13 @@ function getAdminHtml(config) {
       if (!tokens.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
       empty.style.display = 'none';
       tbody.innerHTML = tokens.map(t => {
+        const shortToken = t.token.length > 16 ? t.token.substring(0, 16) + '...' : t.token;
         return \`<tr>
           <td><strong>\${esc(t.name)}</strong></td>
-          <td><div class="token-cell"><code onclick="copyText('\${t.token}')" title="Click to copy full token">\${t.token}</code></div></td>
+          <td><div class="token-cell"><code onclick="copyText('\${t.token}')" title="Click to copy">\${shortToken}</code></div></td>
           <td>\${new Date(t.createdAt).toLocaleDateString()}</td>
-          <td>\${t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleString() : '-'}</td>
-          <td><button class="btn btn-danger" onclick="deleteToken('\${t.id}')">Delete</button></td>
+          <td class="hide-sm">\${t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleString() : '-'}</td>
+          <td class="row-actions"><button class="btn btn-danger btn-sm" onclick="deleteToken('\${t.id}')">Delete</button></td>
         </tr>\`;
       }).join('');
     }
