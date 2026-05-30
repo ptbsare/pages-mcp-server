@@ -36,7 +36,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build",
+    "prepare": "test -f dist/cli.js || npm run build",
     "dev:server": "tsx server/index.ts",
     "dev:client": "tsx client/src/cli.ts",
     "docker:build": "docker build -t pages-mcp-server .",
@@ -51,9 +51,9 @@
     "mime-types": "^2.1.35",
     "basic-auth": "^2.0.1",
     "jsonwebtoken": "^9.0.2",
-    "typescript": "^5.6.0"
   },
   "devDependencies": {
+    "typescript": "^5.6.0",
     "@types/adm-zip": "^0.5.5",
     "@types/express": "^4.17.21",
     "@types/sql.js": "^1.4.9",
