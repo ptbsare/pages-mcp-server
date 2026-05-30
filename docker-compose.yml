@@ -2,15 +2,16 @@ version: "3.8"
 
 services:
   pages-mcp:
-    build: .
+    image: ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
+    container_name: pages-mcp
     ports:
       - "3000:3000"
     environment:
-      - PORT=3000
       - DOMAIN=http://localhost:3000
       - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=changeme
-      - AUTH_TOKEN=my-secret-token
+      - ADMIN_PASSWORD=admin123
+      # Optional: initial API token(s), comma-separated
+      # - AUTH_TOKEN=my-initial-token
       - DB_PATH=/data/db/pages.db
       - STORAGE_PATH=/data/storage
     volumes:
@@ -19,3 +20,4 @@ services:
 
 volumes:
   pages-data:
+    driver: local

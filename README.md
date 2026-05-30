@@ -23,13 +23,12 @@ npx github:ptbsare/pages-mcp-server server \
   --port 3000 \
   --domain https://mysite.com \
   --admin-user admin \
-  --admin-pass secret \
-  --auth-token my-secret-token
+  --admin-pass secret
 
 # Start stdio MCP client (for AI assistants like Cursor, Claude Desktop)
 npx github:ptbsare/pages-mcp-server client \
   --url https://mysite.com \
-  --auth-token my-secret-token
+  --auth-token your-api-token
 
 # Interactive CLI mode
 npx github:ptbsare/pages-mcp-server client \
@@ -46,30 +45,65 @@ docker run -d \
   -e DOMAIN=https://mysite.com \
   -e ADMIN_USERNAME=admin \
   -e ADMIN_PASSWORD=secret \
-  -e AUTH_TOKEN=my-secret-token \
   -v pages-data:/data \
   ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
 ```
 
-Or with `docker-compose`:
+#### Docker Volume Mounts
+
+The container persists all data under `/data`. You should mount this volume to avoid data loss on container restart:
+
+| Container Path | Description |
+|----------------|-------------|
+| `/data/db/pages.db` | SQLite database (pages, tokens) |
+| `/data/storage/` | Deployed static files (all `/s/:shareId` content) |
+
+Using a named volume (`-v pages-data:/data`) is recommended. You can also bind-mount a host directory:
+
+```bash
+docker run -d \
+  --name pages-mcp \
+  -p 3000:3000 \
+  -e DOMAIN=https://mysite.com \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD=secret \
+  -v /opt/pages-mcp/data:/data \
+  ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
+```
+
+### Via Docker Compose
 
 ```yaml
 version: "3.8"
+
 services:
   pages-mcp:
     image: ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
+    container_name: pages-mcp
     ports:
       - "3000:3000"
     environment:
       - DOMAIN=https://mysite.com
       - ADMIN_USERNAME=admin
       - ADMIN_PASSWORD=secret
-      - AUTH_TOKEN=my-secret-token
+      # Optional: initial API token(s), comma-separated
+      # - AUTH_TOKEN=my-initial-token
+      - DB_PATH=/data/db/pages.db
+      - STORAGE_PATH=/data/storage
     volumes:
       - pages-data:/data
     restart: unless-stopped
+
 volumes:
   pages-data:
+    driver: local
+```
+
+Save as `docker-compose.yml` and run:
+
+```bash
+docker compose up -d
+docker compose logs -f
 ```
 
 ### Via Source
@@ -258,10 +292,7 @@ docker pull ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
 # Copy the service file
 sudo cp pages-mcp-server.service /etc/systemd/system/
 
-# Edit the service file to match your config
-sudo systemctl edit pages-mcp-server
-
-# Start and enable
+# Reload and start
 sudo systemctl daemon-reload
 sudo systemctl start pages-mcp-server
 sudo systemctl enable pages-mcp-server
@@ -270,6 +301,8 @@ sudo systemctl enable pages-mcp-server
 sudo systemctl status pages-mcp-server
 sudo journalctl -u pages-mcp-server -f
 ```
+
+The service file uses `npx github:ptbsare/pages-mcp-server` to run, so it always pulls the latest code on first start. Data is stored in `/root/.pages-mcp/` by default.
 
 ## License
 
