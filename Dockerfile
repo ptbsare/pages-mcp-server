@@ -2,15 +2,20 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies
+# Copy package files first (for layer caching)
 COPY package.json package-lock.json ./
-RUN npm ci --production
+
+# Install ALL dependencies (including dev) so we can build
+RUN npm ci
 
 # Copy source
 COPY . .
 
 # Build TypeScript
 RUN npm run build
+
+# Remove dev dependencies to reduce image size
+RUN npm prune --production
 
 # Create data directories
 RUN mkdir -p /data/storage /data/db
