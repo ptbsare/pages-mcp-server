@@ -1,0 +1,134 @@
+name: ✨ Feature Request / Enhancement | 功能请求 / 改进建议
+description: Suggest a new feature or enhancement | 建议新功能或改进
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a new feature or improvement! Please fill out the form below.
+
+        感谢您提出新功能或改进建议！请填写以下表单。
+
+        ---
+
+        **⚠️ Important Note | 重要说明:**
+
+        This is an open-source project maintained by volunteers who contribute code in their spare time, often sacrificing time with their families.
+
+        **Feature requests with Pull Requests are highly preferred and will be prioritized.** Without a PR, your request may be postponed indefinitely depending on the maintainer's availability.
+
+        这是一个由志愿者维护的开源项目，他们用业余时间贡献代码，经常牺牲陪伴家人的时间。
+
+        **我们更欢迎带有 Pull Request 的功能请求，这些请求将被优先处理。** 如果没有 PR，您的请求可能会被无限期搁置，具体取决于维护者是否有时间实现。
+
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: Feature Type | 功能类型
+      description: What type of feature are you requesting? | 您请求的是什么类型的功能？
+      options:
+        - New Feature | 新功能
+        - Enhancement (Improvement to existing feature) | 增强（对现有功能的改进）
+        - UI/UX Improvement | UI/UX 改进
+        - Performance Optimization | 性能优化
+        - Documentation | 文档改进
+        - MCP Tool / Protocol | MCP 工具 / 协议支持
+        - Deployment / Docker | 部署 / Docker 改进
+        - Other | 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-description
+    attributes:
+      label: Problem Description | 问题描述
+      description: |
+        Is your feature request related to a problem? Please describe.
+        您的功能请求是否与某个问题有关？请描述。
+      placeholder: |
+        I'm always frustrated when...
+        我总是对...感到困扰...
+
+        It would be better if...
+        如果...会更好...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution | 建议的解决方案
+      description: |
+        Describe the solution you'd like. Be as detailed as possible.
+        描述您想要的解决方案。请尽可能详细。
+
+        💡 Tip: You can attach mockups, sketches or screenshots by dragging & dropping them.
+        💡 提示：您可以通过拖放来附加原型图、草图或截图。
+      placeholder: |
+        I would like to see...
+        我希望看到...
+
+        The feature should work like this...
+        该功能应该这样工作...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered | 考虑过的替代方案
+      description: |
+        Describe any alternative solutions or features you've considered.
+        描述您考虑过的任何替代解决方案或功能。
+      placeholder: |
+        An alternative would be...
+        一个替代方案是...
+
+        I also thought about...
+        我还考虑过...
+    validations:
+      required: false
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case / User Story | 使用场景 / 用户故事
+      description: |
+        Describe a specific use case or user story for this feature.
+        描述此功能的具体使用场景或用户故事。
+      placeholder: |
+        As a [user type], I want to [action], so that [benefit].
+        作为一个 [用户类型]，我想要 [操作]，以便 [获得好处]。
+
+        Example: As a developer, I want to deploy a static site via MCP from my AI assistant, so that I can quickly share preview links.
+        示例：作为一个开发者，我想通过 AI 助手的 MCP 部署静态站点，以便快速分享预览链接。
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context | 附加信息
+      description: |
+        Add any other context, screenshots, mockups, or examples about the feature request here.
+        在此添加有关功能请求的任何其他上下文、截图、原型图或示例。
+      placeholder: |
+        Add any relevant links, screenshots, mockups, or examples
+        添加任何相关链接、截图、原型图或示例
+    validations:
+      required: false
+
+  - type: dropdown
+    id: willing-to-pr
+    attributes:
+      label: Are you willing to submit a Pull Request to implement this feature? | 您是否愿意提交 Pull Request 来实现此功能？
+      description: |
+        We appreciate any contributions! No worries if you're not able to.
+        我们感谢任何贡献！如果您无法贡献也没关系。
+      options:
+        - "Yes, I'd like to implement this | 是的，我想实现它"
+        - "Maybe, with some guidance | 可能，需要一些指导"
+        - "No, I'm just suggesting | 不，我只是提建议"
+    validations:
+      required: true

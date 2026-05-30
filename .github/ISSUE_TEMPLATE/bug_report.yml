@@ -1,0 +1,186 @@
+name: 🐛 Bug Report | 错误报告
+description: Report a bug or unexpected behavior | 报告错误或异常行为
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report this issue! Please fill out the form below to help us understand and fix the problem.
+
+        感谢您花时间报告此问题！请填写以下表单以帮助我们理解并修复问题。
+
+  - type: input
+    id: version
+    attributes:
+      label: Version | 版本
+      description: |
+        What version of Pages MCP Server are you using? (You can find it in the Docker image tag or `package.json`)
+        您正在使用的 Pages MCP Server 版本是什么？（您可以在 Docker 镜像标签或 `package.json` 中找到版本号）
+      placeholder: e.g., v1.0.0, beta, or commit hash | 例如：v1.0.0、beta 或 cb82b12
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System | 操作系统
+      description: What operating system are you running the application on? | 您在什么操作系统上运行此应用？
+      options:
+        - Linux - Debian
+        - Linux - Ubuntu
+        - Linux - CentOS/RHEL/Rocky/AlmaLinux
+        - Linux - Fedora
+        - Linux - Arch Linux
+        - Linux - openSUSE
+        - Linux - Manjaro
+        - Linux - OpenWrt
+        - NAS - Synology DSM (群晖)
+        - NAS - QNAP QTS/QuTS (威联通)
+        - NAS - Unraid
+        - NAS - TrueNAS (FreeNAS)
+        - NAS - OpenMediaVault (OMV)
+        - NAS - CasaOS
+        - NAS - UGREEN NAS (绿联)
+        - NAS - iStoreOS (爱快)
+        - NAS - FNas (飞牛)
+        - NAS - TerraMaster TOS (铁威马)
+        - NAS - Asustor ADM (华芸)
+        - NAS - WD My Cloud
+        - NAS - Seagate NAS OS
+        - Home Assistant OS (HAOS)
+        - Windows 11
+        - Windows 10
+        - Windows Server
+        - macOS Tahoe (26.x)
+        - macOS Sequoia (15.x)
+        - macOS Sonoma (14.x)
+        - macOS Ventura (13.x)
+        - macOS Monterey (12.x)
+        - macOS Big Sur (11.x)
+        - FreeBSD
+        - Other (please specify in additional context) | 其他（请在附加信息中说明）
+    validations:
+      required: true
+
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: System Architecture | 系统架构
+      description: What is your system architecture? | 您的系统架构是什么？
+      options:
+        - x64 (AMD64/x86_64)
+        - ARM64 (aarch64/ARMv8)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment Method | 部署方式
+      description: How are you running Pages MCP Server? | 您是如何运行 Pages MCP Server 的？
+      options:
+        - Docker (ghcr.io image) | Docker (ghcr.io 镜像)
+        - Docker (self-built) | Docker (自行构建)
+        - npx (directly from GitHub) | npx (直接从 GitHub 运行)
+        - Source (cloned repository) | 源码 (克隆仓库后运行)
+        - Other | 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to Reproduce | 复现步骤
+      description: |
+        Please provide detailed steps to reproduce the issue
+        请提供详细的复现步骤
+      placeholder: |
+        1. Go to '...' | 进入 '...'
+        2. Click on '...' | 点击 '...'
+        3. Scroll down to '...' | 向下滚动到 '...'
+        4. See error | 看到错误
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior (Bug Phenomenon) | 实际行为（Bug 现象）
+      description: |
+        What actually happened? Please describe the bug in detail.
+        实际发生了什么？请详细描述 Bug。
+
+        💡 Tip: You can attach images or screen recordings by dragging & dropping, selecting or pasting them.
+        💡 提示：您可以通过拖放、选择或粘贴来附加图片或录屏。
+      placeholder: |
+        Describe what actually happened. Include screenshots if possible.
+        描述实际发生的情况。如果可能，请包含截图。
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior | 期望行为
+      description: |
+        What did you expect to happen?
+        您期望发生什么？
+      placeholder: |
+        Describe what you expected to happen
+        描述您期望发生的情况
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Container / Application Logs | 容器 / 应用日志
+      description: |
+        Please paste the relevant logs
+        请粘贴相关日志
+
+        For Docker users, use: `docker logs <container-name>`
+        对于 Docker 用户，使用：`docker logs <容器名>`
+
+        For Docker Compose users: `docker compose logs`
+        对于 Docker Compose 用户：`docker compose logs`
+
+        For npx / source users, paste the terminal output
+        对于 npx / 源码用户，粘贴终端输出
+
+        💡 Tip: Include full logs if possible, not just the error message
+        💡 提示：如果可能，请包含完整日志，而不仅仅是错误消息
+      placeholder: |
+        Paste your logs here
+        在此粘贴您的日志
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context | 附加信息
+      description: |
+        Add any other context about the problem here (screenshots, configuration files, MCP client info, etc.)
+        在此添加有关问题的任何其他上下文信息（截图、配置文件、MCP 客户端信息等）
+      placeholder: |
+        Add screenshots, configuration snippets, MCP client info, or any other relevant information
+        添加截图、配置片段、MCP 客户端信息或任何其他相关信息
+    validations:
+      required: false
+
+  - type: dropdown
+    id: willing-to-pr
+    attributes:
+      label: Are you willing to submit a Pull Request to fix this bug? | 您是否愿意提交 Pull Request 来修复此 Bug？
+      description: |
+        We appreciate any contributions! No worries if you're not able to.
+        我们感谢任何贡献！如果您无法贡献也没关系。
+      options:
+        - "Yes, I'd like to fix this | 是的，我想修复它"
+        - "Maybe, with some guidance | 可能，需要一些指导"
+        - "No, I need help with this | 不，我需要帮助"
+    validations:
+      required: true
