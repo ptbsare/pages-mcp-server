@@ -9,7 +9,8 @@ Self-hosted MCP server for deploying and managing static websites. Deploy HTML p
 - **Public page serving** — all deployed pages accessible at `/s/:shareId`, no auth required
 - **MCP protocol** — 4 tools: `deploy_html`, `deploy_folder`, `list_pages`, `delete_page`
 - **Multi-token auth** — create/revoke API tokens from the admin dashboard
-- **Admin dashboard** — web UI for managing pages and tokens
+- **Admin dashboard** — web UI at `/` for managing pages, tokens, and 2FA settings
+- **Two-factor authentication (2FA)** — optional TOTP-based 2FA for admin access (Google Authenticator compatible)
 - **Docker support** — multi-arch images on GHCR
 - **npx runnable** — no install needed, run directly from GitHub
 
@@ -51,15 +52,14 @@ docker run -d \
 
 #### Docker Volume Mounts
 
-The container persists all data under `/data`. You should mount this volume to avoid data loss on container restart:
+All persistent data lives under `/data` inside the container. **You must mount this volume** or data will be lost on container restart:
 
-| Container Path | Description |
-|----------------|-------------|
-| `/data/db/pages.db` | SQLite database (pages, tokens) |
-| `/data/storage/` | Deployed static files (all `/s/:shareId` content) |
+| Container Path | Description | Mount Recommendation |
+|----------------|-------------|---------------------|
+| `/data/db/pages.db` | SQLite database (pages, tokens, OTP settings) | **Required** |
+| `/data/storage/` | Deployed static files (all `/s/:shareId` content) | **Required** |
 
-Using a named volume (`-v pages-data:/data`) is recommended. You can also bind-mount a host directory:
-
+**Named volume (recommended):**
 ```bash
 docker run -d \
   --name pages-mcp \
@@ -67,6 +67,20 @@ docker run -d \
   -e DOMAIN=https://mysite.com \
   -e ADMIN_USERNAME=admin \
   -e ADMIN_PASSWORD=secret \
+  -v pages-data:/data \
+  ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
+```
+
+**Bind mount (for custom paths):**
+```bash
+docker run -d \
+  --name pages-mcp \
+  -p 3000:3000 \
+  -e DOMAIN=https://mysite.com \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD=secret \
+  -e DB_PATH=/data/db/pages.db \
+  -e STORAGE_PATH=/data/storage \
   -v /opt/pages-mcp/data:/data \
   ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
 ```
@@ -91,6 +105,7 @@ services:
       - DB_PATH=/data/db/pages.db
       - STORAGE_PATH=/data/storage
     volumes:
+      # Mount /data to persist database + deployed files
       - pages-data:/data
     restart: unless-stopped
 
@@ -121,14 +136,15 @@ node dist/server/index.js
 ┌──────────────────────────────────────────────────────────┐
 │                      Server (Express)                     │
 │                                                          │
-│  /mcp              → MCP JSON-RPC (Bearer token auth)    │
-│  /api/deploy/html  → Deploy HTML string                  │
-│  /api/deploy/folder→ Deploy zip archive (base64)         │
-│  /api/admin/pages  → CRUD pages (Basic auth)             │
-│  /api/admin/tokens → CRUD API tokens (Basic auth)        │
-│  /admin            → Admin Dashboard (HTML UI)           │
-│  /s/:shareId       → Public static page (no auth)        │
-│  /health           → Health check                        │
+│  /                  → Admin Dashboard (Basic auth + 2FA) │
+│  /mcp               → MCP JSON-RPC (Bearer token auth)   │
+│  /api/deploy/html   → Deploy HTML string                 │
+│  /api/deploy/folder → Deploy zip archive (base64)        │
+│  /api/admin/pages   → CRUD pages (Basic auth + 2FA)      │
+│  /api/admin/tokens  → CRUD API tokens (Basic auth + 2FA) │
+│  /api/admin/otp/*   → OTP setup/verify/disable           │
+│  /s/:shareId        → Public static page (no auth)       │
+│  /health            → Health check                       │
 │                                                          │
 │  sql.js (SQLite) + File Storage                          │
 └──────────────────────────────────────────────────────────┘
@@ -146,14 +162,24 @@ node dist/server/index.js
 
 ### Authentication
 
-Two auth layers:
-
 | Layer | Method | Used For |
 |-------|--------|----------|
-| **Admin** | HTTP Basic (`username:password`) | Admin dashboard, token management, page CRUD |
+| **Admin** | HTTP Basic (`username:password`) + optional TOTP 2FA | Admin dashboard, token management, page CRUD |
 | **API/MCP** | Bearer token (`Authorization: Bearer <token>`) | MCP endpoint, deploy API |
 
-API tokens can be managed at `/admin` dashboard or via `/api/admin/tokens` REST API.
+API tokens can be managed at `/` dashboard or via `/api/admin/tokens` REST API.
+
+### Admin 2FA (TOTP)
+
+The admin panel supports optional two-factor authentication using TOTP (Google Authenticator, Authy, etc.).
+
+**Setup flow:**
+1. `POST /api/admin/otp/setup` — generates secret + otpauth URL
+2. Scan QR code (generated from otpauth URL) with your authenticator app
+3. `POST /api/admin/otp/verify` with a 6-digit code to enable 2FA
+4. Once enabled, all admin requests require `X-OTP-Code` header with a valid TOTP code
+
+**Disable:** `POST /api/admin/otp/disable` (requires current OTP code)
 
 ### REST Endpoints
 
@@ -226,6 +252,8 @@ All tools accept optional `name` and `description` parameters.
 
 ### Cursor / Claude Desktop (stdio mode)
 
+The stdio client connects to a **remote** server and proxies MCP tools over HTTP. You can specify the remote server URL and port:
+
 ```json
 {
   "mcpServers": {
@@ -234,7 +262,7 @@ All tools accept optional `name` and `description` parameters.
       "args": [
         "github:ptbsare/pages-mcp-server",
         "client",
-        "--url", "https://mysite.com",
+        "--url", "https://mysite.com:38300",
         "--auth-token", "your-api-token"
       ]
     }
@@ -242,13 +270,37 @@ All tools accept optional `name` and `description` parameters.
 }
 ```
 
-### Remote HTTP mode (direct)
+**Key points:**
+- `--url` specifies the full remote server URL including port (e.g. `https://mysite.com:38300`)
+- `--auth-token` is an API token created from the admin dashboard at `/`
+- The stdio client runs locally and communicates with the remote server via HTTP
+
+**With custom port:**
+```json
+{
+  "mcpServers": {
+    "pages-mcp": {
+      "command": "npx",
+      "args": [
+        "github:ptbsare/pages-mcp-server",
+        "client",
+        "--url", "http://192.168.1.100:38300",
+        "--auth-token", "your-api-token"
+      ]
+    }
+  }
+}
+```
+
+### Remote HTTP mode (direct, no stdio proxy)
+
+Some MCP clients support direct HTTP transport:
 
 ```json
 {
   "mcpServers": {
     "pages-mcp": {
-      "url": "https://mysite.com/mcp",
+      "url": "https://mysite.com:38300/mcp",
       "headers": {
         "Authorization": "Bearer your-api-token"
       }
@@ -269,7 +321,7 @@ All tools accept optional `name` and `description` parameters.
 | `DB_PATH` | ~/.pages-mcp/pages.db | SQLite database path |
 | `STORAGE_PATH` | ~/.pages-mcp/storage | File storage path |
 
-> **Note:** `AUTH_TOKEN` is only used for initial seeding. After that, manage tokens via the admin dashboard at `/admin`. You can create multiple tokens, and revoke them anytime.
+> **Note:** `AUTH_TOKEN` is only used for initial seeding. After that, manage tokens via the admin dashboard at `/`. You can create multiple tokens, and revoke them anytime.
 
 ## Docker Images
 
@@ -292,6 +344,9 @@ docker pull ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
 # Copy the service file
 sudo cp pages-mcp-server.service /etc/systemd/system/
 
+# Edit with your actual credentials
+sudo systemctl edit pages-mcp-server
+
 # Reload and start
 sudo systemctl daemon-reload
 sudo systemctl start pages-mcp-server
@@ -302,7 +357,7 @@ sudo systemctl status pages-mcp-server
 sudo journalctl -u pages-mcp-server -f
 ```
 
-The service file uses `npx github:ptbsare/pages-mcp-server` to run, so it always pulls the latest code on first start. Data is stored in `/root/.pages-mcp/` by default.
+The service file uses `npx github:ptbsare/pages-mcp-server` to run. Data is stored in `/root/.pages-mcp/` by default.
 
 ## License
 

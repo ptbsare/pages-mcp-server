@@ -48,6 +48,12 @@ export class PagesDatabase {
         last_used_at TEXT
       )
     `);
+        this.db.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL DEFAULT ''
+      )
+    `);
     }
     save() {
         if (!this.db)
@@ -206,6 +212,41 @@ export class PagesDatabase {
             createdAt: row.created_at,
             lastUsedAt: row.last_used_at || undefined,
         };
+    }
+    // ─── OTP ──────────────────────────────────────────────
+    async getOtpSecret() {
+        const db = await this.ensureDb();
+        const stmt = db.prepare(`SELECT value FROM settings WHERE key = 'otp_secret'`);
+        stmt.bind([]);
+        if (stmt.step()) {
+            const row = stmt.getAsObject();
+            stmt.free();
+            return row.value || undefined;
+        }
+        stmt.free();
+        return undefined;
+    }
+    async setOtpSecret(secret) {
+        const db = await this.ensureDb();
+        db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('otp_secret', ?)`, [secret]);
+        this.save();
+    }
+    async getOtpEnabled() {
+        const db = await this.ensureDb();
+        const stmt = db.prepare(`SELECT value FROM settings WHERE key = 'otp_enabled'`);
+        stmt.bind([]);
+        if (stmt.step()) {
+            const row = stmt.getAsObject();
+            stmt.free();
+            return row.value === '1';
+        }
+        stmt.free();
+        return false;
+    }
+    async setOtpEnabled(enabled) {
+        const db = await this.ensureDb();
+        db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('otp_enabled', ?)`, [enabled ? '1' : '0']);
+        this.save();
     }
     close() {
         if (this.db) {

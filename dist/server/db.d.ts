@@ -27,6 +27,10 @@ export declare class PagesDatabase {
     updateTokenLastUsed(tokenValue: string): Promise<void>;
     tokenExists(tokenValue: string): Promise<boolean>;
     private rowToAuthToken;
+    getOtpSecret(): Promise<string | undefined>;
+    setOtpSecret(secret: string): Promise<void>;
+    getOtpEnabled(): Promise<boolean>;
+    setOtpEnabled(enabled: boolean): Promise<void>;
     close(): void;
 }
 //# sourceMappingURL=db.d.ts.map
