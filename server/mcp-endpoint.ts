@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PagesDatabase } from "./db.js";
 import { FileStorage } from "./storage.js";
 import type { ServerConfig } from "../shared/types.js";
+import { buildUrl } from "../shared/types.js";
 import { nanoid } from "nanoid";
 
 /**
@@ -156,7 +157,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
             updatedAt: now,
           });
 
-          const url = `${config.domain}/s/${shareId}`;
+          const url = `${buildUrl(config.domain, config.port)}/s/${shareId}`;
           res.json({
             jsonrpc: "2.0",
             id: body.id,
@@ -233,7 +234,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
             updatedAt: now,
           });
 
-          const url = `${config.domain}/s/${shareId}`;
+          const url = `${buildUrl(config.domain, config.port)}/s/${shareId}`;
           res.json({
             jsonrpc: "2.0",
             id: body.id,
@@ -266,7 +267,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
 
           const text = result.pages
             .map((p) => {
-              const url = `${config.domain}/s/${p.shareId}`;
+              const url = `${buildUrl(config.domain, config.port)}/s/${p.shareId}`;
               return `📄 ${p.name}\n   ID: ${p.id}\n   URL: ${url}\n   Files: ${p.fileCount}\n   Created: ${p.createdAt}`;
             })
             .join("\n\n");

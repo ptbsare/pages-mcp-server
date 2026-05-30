@@ -1,3 +1,4 @@
+import { buildUrl } from "../shared/types.js";
 import { nanoid } from "nanoid";
 /**
  * Handle MCP JSON-RPC requests over HTTP at /mcp
@@ -141,7 +142,7 @@ export function createMcpHandler(config, db, storage) {
                         createdAt: now,
                         updatedAt: now,
                     });
-                    const url = `${config.domain}/s/${shareId}`;
+                    const url = `${buildUrl(config.domain, config.port)}/s/${shareId}`;
                     res.json({
                         jsonrpc: "2.0",
                         id: body.id,
@@ -211,7 +212,7 @@ export function createMcpHandler(config, db, storage) {
                         createdAt: now,
                         updatedAt: now,
                     });
-                    const url = `${config.domain}/s/${shareId}`;
+                    const url = `${buildUrl(config.domain, config.port)}/s/${shareId}`;
                     res.json({
                         jsonrpc: "2.0",
                         id: body.id,
@@ -241,7 +242,7 @@ export function createMcpHandler(config, db, storage) {
                     }
                     const text = result.pages
                         .map((p) => {
-                        const url = `${config.domain}/s/${p.shareId}`;
+                        const url = `${buildUrl(config.domain, config.port)}/s/${p.shareId}`;
                         return `📄 ${p.name}\n   ID: ${p.id}\n   URL: ${url}\n   Files: ${p.fileCount}\n   Created: ${p.createdAt}`;
                     })
                         .join("\n\n");

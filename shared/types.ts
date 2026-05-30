@@ -48,7 +48,7 @@ export interface AdminCredentials {
 export interface ServerConfig {
   /** Port to listen on */
   port: number;
-  /** Base domain, e.g. "https://mysite.com" */
+  /** Base domain, e.g. "https://mysite.com" or "https://mysite.com:38300" */
   domain: string;
   /** Admin username */
   adminUsername: string;
@@ -60,6 +60,20 @@ export interface ServerConfig {
   dbPath: string;
   /** Path to uploaded files storage */
   storagePath: string;
+}
+
+/** Build a public URL with port if non-standard */
+export function buildUrl(domain: string, port: number): string {
+  try {
+    const url = new URL(domain);
+    const isDefaultPort = (url.protocol === "https:" && port === 443) || (url.protocol === "http:" && port === 80);
+    if (!isDefaultPort && !url.port) {
+      url.port = String(port);
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return domain;
+  }
 }
 
 /** MCP tool: deploy_html input */

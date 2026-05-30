@@ -39,7 +39,7 @@ export interface AdminCredentials {
 export interface ServerConfig {
     /** Port to listen on */
     port: number;
-    /** Base domain, e.g. "https://mysite.com" */
+    /** Base domain, e.g. "https://mysite.com" or "https://mysite.com:38300" */
     domain: string;
     /** Admin username */
     adminUsername: string;
@@ -52,6 +52,8 @@ export interface ServerConfig {
     /** Path to uploaded files storage */
     storagePath: string;
 }
+/** Build a public URL with port if non-standard */
+export declare function buildUrl(domain: string, port: number): string;
 /** MCP tool: deploy_html input */
 export interface DeployHtmlInput {
     value: string;

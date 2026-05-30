@@ -15,6 +15,7 @@ import type {
   AuthToken,
   ErrorResponse,
 } from "../shared/types.js";
+import { buildUrl } from "../shared/types.js";
 
 // ─── OTP helpers ────────────────────────────────────────────
 function generateOtpSecret(): string {
@@ -129,7 +130,7 @@ export function createApp(config: ServerConfig) {
       const now = new Date().toISOString();
       storage.storeHtml(shareId, value);
       db.createPage({ id, shareId, name: name || `Page ${shareId}`, description, fileCount: 1, createdAt: now, updatedAt: now });
-      const url = `${config.domain}/s/${shareId}`;
+      const url = `${buildUrl(config.domain, config.port)}/s/${shareId}`;
       res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, createdAt: now });
     } catch (err: any) {
       res.status(500).json({ error: "Deploy failed", message: err.message } as ErrorResponse);
@@ -147,7 +148,7 @@ export function createApp(config: ServerConfig) {
       const now = new Date().toISOString();
       const result = storage.storeZip(shareId, zipBase64);
       db.createPage({ id, shareId, name: name || `Page ${shareId}`, description, fileCount: result.fileCount, createdAt: now, updatedAt: now });
-      const url = `${config.domain}/s/${shareId}`;
+      const url = `${buildUrl(config.domain, config.port)}/s/${shareId}`;
       res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, createdAt: now });
     } catch (err: any) {
       res.status(500).json({ error: "Deploy failed", message: err.message } as ErrorResponse);
@@ -193,7 +194,7 @@ export function createApp(config: ServerConfig) {
       const secret = generateOtpSecret();
       await db.setOtpSecret(secret);
       await db.setOtpEnabled(false); // Not enabled until verified
-      const url = buildOtpauthUrl(secret, config.adminUsername, config.domain);
+      const url = buildOtpauthUrl(secret, config.adminUsername, buildUrl(config.domain, config.port));
       res.json({ secret, otpauthUrl: url });
     } catch (err: any) {
       res.status(500).json({ error: "Failed to setup OTP", message: err.message } as ErrorResponse);
@@ -332,64 +333,91 @@ function getAdminHtml(config: ServerConfig): string {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pages MCP Admin</title>
   <style>
+    /* ─── Theme Variables ─────────────────────────────────── */
+    :root {
+      --bg: #f5f5f5; --bg2: white; --bg3: #fafafa; --bg4: #f9fafb;
+      --text: #333; --text2: #666; --text3: #888; --text4: #999;
+      --border: #eee; --border2: #f0f0f0; --border3: #ddd;
+      --accent: #667eea; --accent2: #5a6fd6;
+      --green: #059669; --green-bg: #ecfdf5;
+      --red: #dc2626; --red-bg: #fee2e2;
+      --blue: #6366f1; --blue-bg: #eef2ff;
+      --shadow: 0 1px 3px rgba(0,0,0,0.1);
+      --header-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    [data-theme="dark"] {
+      --bg: #0f172a; --bg2: #1e293b; --bg3: #1e293b; --bg4: #334155;
+      --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b; --text4: #475569;
+      --border: #334155; --border2: #1e293b; --border3: #475569;
+      --accent: #818cf8; --accent2: #6366f1;
+      --green: #34d399; --green-bg: rgba(52,211,153,0.1);
+      --red: #f87171; --red-bg: rgba(248,113,113,0.1);
+      --blue: #818cf8; --blue-bg: rgba(129,140,248,0.1);
+      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+      --header-bg: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px 32px; display: flex; justify-content: space-between; align-items: center; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); transition: background 0.2s, color 0.2s; }
+    .header { background: var(--header-bg); color: white; padding: 24px 32px; display: flex; justify-content: space-between; align-items: center; }
     .header h1 { font-size: 24px; font-weight: 600; }
     .header p { opacity: 0.85; margin-top: 4px; font-size: 14px; }
     .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .stat-card .label { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card { background: var(--bg2); border-radius: 12px; padding: 20px; box-shadow: var(--shadow); }
+    .stat-card .label { font-size: 13px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
     .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
-    .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 24px; }
-    .card-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
+    .card { background: var(--bg2); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 24px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
     .card-header h2 { font-size: 18px; font-weight: 600; }
     table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; padding: 12px 20px; background: #fafafa; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; border-bottom: 1px solid #eee; }
-    td { padding: 12px 20px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
-    tr:hover { background: #fafafa; }
-    a { color: #667eea; text-decoration: none; }
+    th { text-align: left; padding: 12px 20px; background: var(--bg3); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); border-bottom: 1px solid var(--border); }
+    td { padding: 12px 20px; border-bottom: 1px solid var(--border2); font-size: 14px; }
+    tr:hover { background: var(--bg3); }
+    a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
-    .badge-blue { background: #eef2ff; color: #6366f1; }
-    .badge-green { background: #ecfdf5; color: #059669; }
-    .badge-red { background: #fee2e2; color: #dc2626; }
+    .badge-blue { background: var(--blue-bg); color: var(--blue); }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+    .badge-red { background: var(--red-bg); color: var(--red); }
     .btn { display: inline-block; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; }
-    .btn-danger { background: #fee2e2; color: #dc2626; }
-    .btn-danger:hover { background: #fecaca; }
-    .btn-edit { background: #eef2ff; color: #6366f1; margin-right: 6px; }
-    .btn-edit:hover { background: #e0e7ff; }
-    .btn-primary { background: #667eea; color: white; padding: 8px 20px; }
-    .btn-primary:hover { background: #5a6fd6; }
-    .btn-cancel { background: #f3f4f6; color: #666; padding: 8px 20px; }
-    .btn-cancel:hover { background: #e5e7eb; }
-    .btn-success { background: #ecfdf5; color: #059669; }
-    .btn-success:hover { background: #d1fae5; }
-    .empty { text-align: center; padding: 40px 20px; color: #999; }
+    .btn-danger { background: var(--red-bg); color: var(--red); }
+    .btn-danger:hover { filter: brightness(0.9); }
+    .btn-edit { background: var(--blue-bg); color: var(--blue); margin-right: 6px; }
+    .btn-edit:hover { filter: brightness(0.9); }
+    .btn-primary { background: var(--accent); color: white; padding: 8px 20px; }
+    .btn-primary:hover { background: var(--accent2); }
+    .btn-cancel { background: var(--bg4); color: var(--text2); padding: 8px 20px; }
+    .btn-cancel:hover { filter: brightness(0.9); }
+    .btn-success { background: var(--green-bg); color: var(--green); }
+    .btn-success:hover { filter: brightness(0.9); }
+    .empty { text-align: center; padding: 40px 20px; color: var(--text4); }
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
     .modal-overlay.active { display: flex; }
-    .modal { background: white; border-radius: 12px; padding: 32px; width: 520px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
+    .modal { background: var(--bg2); border-radius: 12px; padding: 32px; width: 520px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
     .modal h2 { margin-bottom: 20px; }
     .modal h3 { margin: 16px 0 8px; font-size: 15px; }
     .form-group { margin-bottom: 16px; }
     .form-group label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; }
-    .form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border3); border-radius: 8px; font-size: 14px; background: var(--bg2); color: var(--text); }
     .form-group textarea { resize: vertical; min-height: 80px; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
     .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; color: white; font-size: 14px; z-index: 200; transition: opacity 0.3s; }
     .toast-success { background: #10b981; }
     .toast-error { background: #ef4444; }
     .token-cell { display: flex; align-items: center; gap: 8px; }
-    .token-cell code { background: #f5f5f5; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; user-select: all; }
-    .token-cell code:hover { background: #e5e7eb; }
-    .token-cell .copy-hint { font-size: 11px; color: #999; }
+    .token-cell code { background: var(--bg4); padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; user-select: all; }
+    .token-cell code:hover { filter: brightness(0.9); }
+    .token-cell .copy-hint { font-size: 11px; color: var(--text4); }
     .otp-status { display: flex; align-items: center; gap: 8px; }
-    .otp-qr { text-align: center; padding: 16px; background: #f9fafb; border-radius: 8px; margin: 12px 0; }
+    .otp-qr { text-align: center; padding: 16px; background: var(--bg4); border-radius: 8px; margin: 12px 0; }
     .otp-qr img { max-width: 200px; }
-    .otp-secret { font-family: monospace; font-size: 14px; background: #f5f5f5; padding: 8px 12px; border-radius: 6px; word-break: break-all; margin: 8px 0; }
-    .step { margin: 12px 0; padding: 12px; background: #f9fafb; border-radius: 8px; }
-    .step-num { display: inline-block; width: 24px; height: 24px; background: #667eea; color: white; border-radius: 50%; text-align: center; line-height: 24px; font-size: 13px; margin-right: 8px; }
+    .otp-secret { font-family: monospace; font-size: 14px; background: var(--bg4); padding: 8px 12px; border-radius: 6px; word-break: break-all; margin: 8px 0; }
+    .step { margin: 12px 0; padding: 12px; background: var(--bg4); border-radius: 8px; }
+    .step-num { display: inline-block; width: 24px; height: 24px; background: var(--accent); color: white; border-radius: 50%; text-align: center; line-height: 24px; font-size: 13px; margin-right: 8px; }
+    /* ─── Theme Switcher ──────────────────────────────────── */
+    .theme-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-right: 8px; }
+    .theme-btn:hover { background: rgba(255,255,255,0.3); }
+    .theme-btn.active { background: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.5); }
   </style>
 </head>
 <body>
@@ -400,7 +428,12 @@ function getAdminHtml(config: ServerConfig): string {
     </div>
     <div class="otp-status">
       <span id="otpBadge"></span>
-      <button class="btn btn-primary" onclick="openOtpModal()">🔐 2FA Settings</button>
+      <button class="btn btn-primary" onclick="openOtpModal()">🔐 2FA</button>
+      <div style="display:flex;gap:4px;margin-left:8px;">
+        <button class="theme-btn" id="themeAuto" onclick="setTheme('auto')" title="Follow system">🌓 Auto</button>
+        <button class="theme-btn" id="themeLight" onclick="setTheme('light')" title="Light mode">☀️</button>
+        <button class="theme-btn" id="themeDark" onclick="setTheme('dark')" title="Dark mode">🌙</button>
+      </div>
     </div>
   </div>
   <div class="container">
@@ -408,7 +441,7 @@ function getAdminHtml(config: ServerConfig): string {
       <div class="stat-card"><div class="label">Total Pages</div><div class="value" id="totalPages">-</div></div>
       <div class="stat-card"><div class="label">API Tokens</div><div class="value" id="totalTokens">-</div></div>
       <div class="stat-card"><div class="label">2FA</div><div class="value" id="otpStatus" style="font-size:18px;margin-top:8px;">-</div></div>
-      <div class="stat-card"><div class="label">Domain</div><div class="value" style="font-size:14px;margin-top:8px;word-break:break-all;">${config.domain}</div></div>
+      <div class="stat-card"><div class="label">Domain</div><div class="value" style="font-size:14px;margin-top:8px;word-break:break-all;">${buildUrl(config.domain, config.port)}</div></div>
     </div>
 
     <!-- Pages -->
@@ -503,7 +536,7 @@ function getAdminHtml(config: ServerConfig): string {
       if (!pages.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
       empty.style.display = 'none';
       tbody.innerHTML = pages.map(p => {
-        const url = '${config.domain}/s/' + p.shareId;
+        const url = '${buildUrl(config.domain, config.port)}/s/' + p.shareId;
         return \`<tr>
           <td><strong>\${esc(p.name)}</strong>\${p.description ? '<br><small style=\\"color:#888\\">'+esc(p.description)+'</small>' : ''}</td>
           <td><a href="\${url}" target="_blank">/s/\${p.shareId}</a></td>
@@ -670,6 +703,30 @@ function getAdminHtml(config: ServerConfig): string {
       document.body.appendChild(t);
       setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2500);
     }
+
+    // ─── Theme ────────────────────────────────────────────
+    function applyTheme(t) {
+      if (t === 'dark') { document.documentElement.setAttribute('data-theme','dark'); }
+      else if (t === 'light') { document.documentElement.removeAttribute('data-theme'); }
+      else { // auto
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        if (mq.matches) document.documentElement.setAttribute('data-theme','dark');
+        else document.documentElement.removeAttribute('data-theme');
+      }
+      document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById('theme' + t.charAt(0).toUpperCase() + t.slice(1));
+      if (btn) btn.classList.add('active');
+    }
+    function setTheme(t) {
+      localStorage.setItem('theme', t);
+      applyTheme(t);
+    }
+    // Listen for system theme changes in auto mode
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (localStorage.getItem('theme') === 'auto' || !localStorage.getItem('theme')) applyTheme('auto');
+    });
+    // Init theme from saved preference or default to auto
+    applyTheme(localStorage.getItem('theme') || 'auto');
 
     loadPages(); loadTokens(); loadOtpStatus();
   </script>

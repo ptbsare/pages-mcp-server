@@ -5,6 +5,7 @@ import { createMcpHandler } from "./mcp-endpoint.js";
 import { bearerAuth } from "./auth.js";
 import { nanoid } from "nanoid";
 import type { ServerConfig } from "../shared/types.js";
+import { buildUrl } from "../shared/types.js";
 
 function loadConfig(): ServerConfig {
   const port = parseInt(process.env.PORT || "3000", 10);
@@ -22,12 +23,13 @@ export function startServer(config?: Partial<ServerConfig>) {
   const defaults = loadConfig();
   const fullConfig: ServerConfig = { ...defaults, ...config };
 
+  const publicUrl = buildUrl(fullConfig.domain, fullConfig.port);
   console.log(`\n🚀 Pages MCP Server`);
-  console.log(`   Domain:  ${fullConfig.domain}`);
+  console.log(`   Public:  ${publicUrl}`);
   console.log(`   Port:    ${fullConfig.port}`);
-  console.log(`   Admin:   ${fullConfig.domain}/admin`);
-  console.log(`   MCP:     ${fullConfig.domain}/mcp`);
-  console.log(`   Deploy:  POST ${fullConfig.domain}/api/deploy/html`);
+  console.log(`   Admin:   ${publicUrl}/`);
+  console.log(`   MCP:     ${publicUrl}/mcp`);
+  console.log(`   Deploy:  POST ${publicUrl}/api/deploy/html`);
   console.log(``);
 
   const { app, db, storage } = createApp(fullConfig);

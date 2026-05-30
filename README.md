@@ -19,21 +19,36 @@ Self-hosted MCP server for deploying and managing static websites. Deploy HTML p
 ### Via npx (recommended)
 
 ```bash
-# Start server
+# Start server (replace 38300 with your desired port)
 npx github:ptbsare/pages-mcp-server server \
-  --port 3000 \
+  --port 38300 \
   --domain https://mysite.com \
   --admin-user admin \
   --admin-pass secret
+```
 
-# Start stdio MCP client (for AI assistants like Cursor, Claude Desktop)
+After starting, access the **admin dashboard** at:
+```
+https://mysite.com:38300/
+```
+Log in with the admin username/password you set. From there you can:
+- Create & manage API tokens
+- View & delete deployed pages
+- Enable 2FA (TOTP) for admin access
+
+> **Note:** If your server runs on a non-standard port (not 80/443), include the port in the URL: `https://mysite.com:38300/`. The `--domain` should be the base URL without port — the server automatically appends the port to generated share URLs.
+
+**Start stdio MCP client** (for AI assistants like Cursor, Claude Desktop):
+```bash
 npx github:ptbsare/pages-mcp-server client \
-  --url https://mysite.com \
+  --url https://mysite.com:38300 \
   --auth-token your-api-token
+```
 
-# Interactive CLI mode
+**Interactive CLI mode:**
+```bash
 npx github:ptbsare/pages-mcp-server client \
-  --url https://mysite.com \
+  --url https://mysite.com:38300 \
   --interactive
 ```
 
