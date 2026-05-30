@@ -192,14 +192,21 @@ export function createApp(config) {
             res.status(500).json({ error: err.message });
         }
     });
-    // Generate OTP secret (returns secret + otpauth URL for QR code)
+    // Generate OTP secret (returns secret + QR code as base64 data URL)
     app.post("/api/admin/otp/setup", adminAuth, async (req, res) => {
         try {
             const secret = generateOtpSecret();
             await db.setOtpSecret(secret);
-            await db.setOtpEnabled(false); // Not enabled until verified
-            const url = buildOtpauthUrl(secret, config.adminUsername, buildUrl(config.domain, config.port));
-            res.json({ secret, otpauthUrl: url });
+            await db.setOtpEnabled(false);
+            const otpauthUrl = buildOtpauthUrl(secret, config.adminUsername, buildUrl(config.domain, config.port));
+            // Generate QR code locally as base64 PNG
+            const QRCode = await import("qrcode");
+            const qrDataUrl = await QRCode.toDataURL(otpauthUrl, {
+                width: 200,
+                margin: 2,
+                color: { dark: "#1f2937", light: "#ffffff" },
+            });
+            res.json({ secret, otpauthUrl, qrDataUrl });
         }
         catch (err) {
             res.status(500).json({ error: "Failed to setup OTP", message: err.message });
@@ -354,9 +361,9 @@ function getAdminHtml(config) {
   <style>
     /* ─── Theme Variables ─────────────────────────────────── */
     :root {
-      --bg: #f5f5f5; --bg2: white; --bg3: #fafafa; --bg4: #f9fafb;
-      --text: #333; --text2: #666; --text3: #888; --text4: #999;
-      --border: #eee; --border2: #f0f0f0; --border3: #ddd;
+      --bg: #f5f5f5; --bg2: #fff; --bg3: #fafafa; --bg4: #f3f4f6;
+      --text: #1f2937; --text2: #6b7280; --text3: #9ca3af; --text4: #d1d5db;
+      --border: #e5e7eb; --border2: #f3f4f6; --border3: #d1d5db;
       --accent: #667eea; --accent2: #5a6fd6;
       --green: #059669; --green-bg: #ecfdf5;
       --red: #dc2626; --red-bg: #fee2e2;
@@ -369,74 +376,126 @@ function getAdminHtml(config) {
       --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b; --text4: #475569;
       --border: #334155; --border2: #1e293b; --border3: #475569;
       --accent: #818cf8; --accent2: #6366f1;
-      --green: #34d399; --green-bg: rgba(52,211,153,0.1);
-      --red: #f87171; --red-bg: rgba(248,113,113,0.1);
-      --blue: #818cf8; --blue-bg: rgba(129,140,248,0.1);
-      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+      --green: #34d399; --green-bg: rgba(52,211,153,0.12);
+      --red: #f87171; --red-bg: rgba(248,113,113,0.12);
+      --blue: #818cf8; --blue-bg: rgba(129,140,248,0.12);
+      --shadow: 0 1px 3px rgba(0,0,0,0.4);
       --header-bg: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); transition: background 0.2s, color 0.2s; }
-    .header { background: var(--header-bg); color: white; padding: 24px 32px; display: flex; justify-content: space-between; align-items: center; }
-    .header h1 { font-size: 24px; font-weight: 600; }
-    .header p { opacity: 0.85; margin-top: 4px; font-size: 14px; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: var(--bg2); border-radius: 12px; padding: 20px; box-shadow: var(--shadow); }
-    .stat-card .label { font-size: 13px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
-    .card { background: var(--bg2); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 24px; }
-    .card-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
-    .card-header h2 { font-size: 18px; font-weight: 600; }
-    table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; padding: 12px 20px; background: var(--bg3); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); border-bottom: 1px solid var(--border); }
-    td { padding: 12px 20px; border-bottom: 1px solid var(--border2); font-size: 14px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); transition: background 0.2s, color 0.2s; -webkit-text-size-adjust: 100%; }
+
+    /* ─── Header ─────────────────────────────────────────── */
+    .header { background: var(--header-bg); color: white; padding: 16px 20px; }
+    .header-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .header p { opacity: 0.85; margin-top: 2px; font-size: 13px; }
+    .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+    /* ─── Container ──────────────────────────────────────── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+
+    /* ─── Stats ──────────────────────────────────────────── */
+    .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
+    .stat-card { background: var(--bg2); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+    .stat-card .label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+
+    /* ─── Cards ──────────────────────────────────────────── */
+    .card { background: var(--bg2); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); gap: 8px; }
+    .card-header h2 { font-size: 16px; font-weight: 600; }
+
+    /* ─── Tables ─────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; min-width: 500px; }
+    th { text-align: left; padding: 10px 14px; background: var(--bg3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border2); font-size: 13px; vertical-align: middle; }
     tr:hover { background: var(--bg3); }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+
+    /* ─── Badges ─────────────────────────────────────────── */
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; white-space: nowrap; }
     .badge-blue { background: var(--blue-bg); color: var(--blue); }
     .badge-green { background: var(--green-bg); color: var(--green); }
     .badge-red { background: var(--red-bg); color: var(--red); }
-    .btn { display: inline-block; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; }
+
+    /* ─── Buttons ────────────────────────────────────────── */
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; white-space: nowrap; min-height: 36px; }
     .btn-danger { background: var(--red-bg); color: var(--red); }
-    .btn-danger:hover { filter: brightness(0.9); }
+    .btn-danger:hover { filter: brightness(0.92); }
     .btn-edit { background: var(--blue-bg); color: var(--blue); margin-right: 6px; }
-    .btn-edit:hover { filter: brightness(0.9); }
-    .btn-primary { background: var(--accent); color: white; padding: 8px 20px; }
+    .btn-edit:hover { filter: brightness(0.92); }
+    .btn-primary { background: var(--accent); color: white; padding: 8px 18px; }
     .btn-primary:hover { background: var(--accent2); }
-    .btn-cancel { background: var(--bg4); color: var(--text2); padding: 8px 20px; }
-    .btn-cancel:hover { filter: brightness(0.9); }
+    .btn-cancel { background: var(--bg4); color: var(--text2); padding: 8px 18px; }
+    .btn-cancel:hover { filter: brightness(0.92); }
     .btn-success { background: var(--green-bg); color: var(--green); }
-    .btn-success:hover { filter: brightness(0.9); }
-    .empty { text-align: center; padding: 40px 20px; color: var(--text4); }
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+    .btn-success:hover { filter: brightness(0.92); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; min-height: 32px; }
+
+    /* ─── Empty ──────────────────────────────────────────── */
+    .empty { text-align: center; padding: 32px 16px; color: var(--text4); font-size: 14px; }
+
+    /* ─── Modals ─────────────────────────────────────────── */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; padding: 16px; }
     .modal-overlay.active { display: flex; }
-    .modal { background: var(--bg2); border-radius: 12px; padding: 32px; width: 520px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
-    .modal h2 { margin-bottom: 20px; }
-    .modal h3 { margin: 16px 0 8px; font-size: 15px; }
-    .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+    .modal { background: var(--bg2); border-radius: 16px; padding: 24px; width: 520px; max-width: 100%; max-height: 85vh; overflow-y: auto; }
+    .modal h2 { margin-bottom: 16px; font-size: 20px; }
+    .modal h3 { margin: 14px 0 6px; font-size: 14px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
     .form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border3); border-radius: 8px; font-size: 14px; background: var(--bg2); color: var(--text); }
-    .form-group textarea { resize: vertical; min-height: 80px; }
-    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; color: white; font-size: 14px; z-index: 200; transition: opacity 0.3s; }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+
+    /* ─── Toast ──────────────────────────────────────────── */
+    .toast { position: fixed; bottom: 16px; left: 16px; right: 16px; padding: 12px 16px; border-radius: 10px; color: white; font-size: 14px; z-index: 200; transition: opacity 0.3s; text-align: center; }
     .toast-success { background: #10b981; }
     .toast-error { background: #ef4444; }
-    .token-cell { display: flex; align-items: center; gap: 8px; }
-    .token-cell code { background: var(--bg4); padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; user-select: all; }
-    .token-cell code:hover { filter: brightness(0.9); }
-    .token-cell .copy-hint { font-size: 11px; color: var(--text4); }
-    .otp-status { display: flex; align-items: center; gap: 8px; }
-    .otp-qr { text-align: center; padding: 16px; background: var(--bg4); border-radius: 8px; margin: 12px 0; }
-    .otp-qr img { max-width: 200px; }
-    .otp-secret { font-family: monospace; font-size: 14px; background: var(--bg4); padding: 8px 12px; border-radius: 6px; word-break: break-all; margin: 8px 0; }
-    .step { margin: 12px 0; padding: 12px; background: var(--bg4); border-radius: 8px; }
-    .step-num { display: inline-block; width: 24px; height: 24px; background: var(--accent); color: white; border-radius: 50%; text-align: center; line-height: 24px; font-size: 13px; margin-right: 8px; }
-    /* ─── Theme Switcher ──────────────────────────────────── */
-    .theme-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-right: 8px; }
-    .theme-btn:hover { background: rgba(255,255,255,0.3); }
+
+    /* ─── Token cell ─────────────────────────────────────── */
+    .token-cell { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .token-cell code { background: var(--bg4); padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; user-select: all; word-break: break-all; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .token-cell code:hover { filter: brightness(0.92); }
+
+    /* ─── OTP ────────────────────────────────────────────── */
+    .otp-qr { text-align: center; padding: 12px; background: var(--bg4); border-radius: 8px; margin: 10px 0; }
+    .otp-qr canvas, .otp-qr img { max-width: 180px !important; width: 100%; height: auto; }
+    .otp-secret { font-family: monospace; font-size: 12px; background: var(--bg4); padding: 8px 10px; border-radius: 6px; word-break: break-all; margin: 8px 0; }
+    .step { margin: 10px 0; padding: 10px; background: var(--bg4); border-radius: 8px; font-size: 13px; }
+    .step-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; background: var(--accent); color: white; border-radius: 50%; font-size: 12px; margin-right: 6px; flex-shrink: 0; }
+
+    /* ─── Theme Switcher ─────────────────────────────────── */
+    .theme-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: white; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .theme-btn:hover { background: rgba(255,255,255,0.25); }
     .theme-btn.active { background: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.5); }
+
+    /* ─── Row actions ────────────────────────────────────── */
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    /* ─── Desktop ≥768px ─────────────────────────────────── */
+    @media (min-width: 768px) {
+      .header { padding: 20px 28px; }
+      .header h1 { font-size: 24px; }
+      .header p { font-size: 14px; }
+      .container { padding: 24px; }
+      .stats { grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+      .stat-card { padding: 20px; }
+      .stat-card .label { font-size: 13px; }
+      .stat-card .value { font-size: 28px; }
+      .card { margin-bottom: 24px; }
+      .card-header { padding: 16px 20px; }
+      .card-header h2 { font-size: 18px; }
+      th { padding: 12px 20px; font-size: 12px; }
+      td { padding: 12px 20px; font-size: 14px; }
+      .token-cell code { font-size: 12px; max-width: none; }
+      .otp-qr canvas, .otp-qr img { max-width: 200px !important; }
+      .otp-secret { font-size: 14px; padding: 8px 12px; }
+      .modal { padding: 32px; }
+      .toast { left: auto; right: 24px; bottom: 24px; max-width: 400px; }
+    }
   </style>
 </head>
 <body>
@@ -662,21 +721,25 @@ function getAdminHtml(config) {
     async function setupOtp() {
       const data = await api('/api/admin/otp/setup', { method: 'POST', body: '{}' });
       if (!data) return;
-      openOtpModal(); // Re-open to show QR
+      // Store qrDataUrl for showOtpQr
+      window._otpQrData = data;
+      openOtpModal();
     }
 
     async function showOtpQr() {
-      const status = await api('/api/admin/otp/status');
-      if (!status || !status.hasSecret) return;
-      // Get the otpauth URL by calling setup again (returns existing secret)
-      const data = await api('/api/admin/otp/setup', { method: 'POST', body: '{}' });
-      if (!data) return;
-      // Generate QR code using a public API
-      const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(data.otpauthUrl);
-      document.getElementById('otpQrImg').src = qrUrl;
+      if (!window._otpQrData) {
+        const data = await api('/api/admin/otp/setup', { method: 'POST', body: '{}' });
+        if (!data) return;
+        window._otpQrData = data;
+      }
+      const data = window._otpQrData;
+      // Use base64 QR code from backend
+      if (data.qrDataUrl) {
+        document.getElementById('otpQrImg').src = data.qrDataUrl;
+      }
       // Show secret for manual entry
       const content = document.getElementById('otpContent');
-      content.innerHTML += \`<p style="margin-top:8px;font-size:12px;color:#888;">Can't scan? Enter manually: <code>\${data.secret}</code></p>\`;
+      content.innerHTML += \`<p style="margin-top:8px;font-size:12px;color:var(--text3);">Can't scan? Enter manually: <code>\${data.secret}</code></p>\`;
     }
 
     async function verifyOtp() {
