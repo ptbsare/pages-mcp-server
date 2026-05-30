@@ -252,6 +252,25 @@ Images are published to GHCR on every push:
 docker pull ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
 ```
 
+## Systemd Service (Linux)
+
+```bash
+# Copy the service file
+sudo cp pages-mcp-server.service /etc/systemd/system/
+
+# Edit the service file to match your config
+sudo systemctl edit pages-mcp-server
+
+# Start and enable
+sudo systemctl daemon-reload
+sudo systemctl start pages-mcp-server
+sudo systemctl enable pages-mcp-server
+
+# Check status
+sudo systemctl status pages-mcp-server
+sudo journalctl -u pages-mcp-server -f
+```
+
 ## License
 
 [GPL v3](LICENSE)
