@@ -11,6 +11,7 @@ import type {
   DeployedPage,
   DeployResponse,
   ListPagesResponse,
+  AuthToken,
   ErrorResponse,
 } from "../shared/types.js";
 
@@ -80,7 +81,7 @@ export function createApp(config: ServerConfig) {
   });
 
   // ─── 2. Deploy API (Bearer token) ────────────────────────
-  const deployAuth = bearerAuth(config.authToken);
+  const deployAuth = bearerAuth(db);
 
   // POST /api/deploy/html — deploy a single HTML string
   app.post("/api/deploy/html", deployAuth, (req: Request, res: Response) => {
@@ -227,13 +228,57 @@ export function createApp(config: ServerConfig) {
     }
   });
 
-  // ─── 4. Admin Dashboard (static HTML) ────────────────────
+  // ─── 4. Token Management API (Basic auth) ─────────────
+
+  // List all tokens
+  app.get("/api/admin/tokens", adminAuth, async (req: Request, res: Response) => {
+    try {
+      const tokens = await db.listTokens();
+      res.json({ tokens });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message } as ErrorResponse);
+    }
+  });
+
+  // Create a new token
+  app.post("/api/admin/tokens", adminAuth, async (req: Request, res: Response) => {
+    try {
+      const { name } = req.body;
+      const now = new Date().toISOString();
+      const token: AuthToken = {
+        id: nanoid(),
+        token: nanoid(32),
+        name: name || `Token ${now.slice(0, 10)}`,
+        createdAt: now,
+      };
+      await db.createToken(token);
+      res.status(201).json(token);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to create token", message: err.message } as ErrorResponse);
+    }
+  });
+
+  // Delete a token
+  app.delete("/api/admin/tokens/:id", adminAuth, async (req: Request, res: Response) => {
+    try {
+      const deleted = await db.deleteToken(req.params.id);
+      if (!deleted) {
+        res.status(404).json({ error: "Token not found" } as ErrorResponse);
+        return;
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message } as ErrorResponse);
+    }
+  });
+
+  // ─── 5. Admin Dashboard (static HTML) ────────────────────
   app.get("/admin", adminAuth, (_req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(getAdminHtml(config));
   });
 
-  // ─── 5. Health check ─────────────────────────────────────
+  // ─── 6. Health check ─────────────────────────────────────
   app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
@@ -305,6 +350,10 @@ function getAdminHtml(config: ServerConfig): string {
         <div class="value" id="totalPages">-</div>
       </div>
       <div class="stat-card">
+        <div class="label">API Tokens</div>
+        <div class="value" id="totalTokens">-</div>
+      </div>
+      <div class="stat-card">
         <div class="label">Domain</div>
         <div class="value" style="font-size:16px;margin-top:8px;word-break:break-all;">${config.domain}</div>
       </div>
@@ -324,6 +373,27 @@ function getAdminHtml(config: ServerConfig): string {
       </table>
       <div class="empty" id="emptyState" style="display:none;">No pages deployed yet.</div>
     </div>
+  </div>
+
+  <!-- Token Management Section -->
+  <div style="margin-top:24px;background:white;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #eee;">
+      <h2 style="font-size:18px;font-weight:600;">🔑 API Tokens</h2>
+      <button class="btn btn-primary" onclick="createToken()" style="display:flex;align-items:center;gap:6px;">+ New Token</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Token</th>
+          <th>Created</th>
+          <th>Last Used</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tokenTable"></tbody>
+    </table>
+    <div class="empty" id="emptyTokens" style="display:none;">No API tokens yet. Create one to use the MCP / Deploy API.</div>
   </div>
 
   <!-- Edit Modal -->
@@ -347,6 +417,7 @@ function getAdminHtml(config: ServerConfig): string {
 
   <script>
     let pages = [];
+    let tokens = [];
     let editingId = null;
 
     async function loadPages() {
@@ -358,6 +429,18 @@ function getAdminHtml(config: ServerConfig): string {
         renderTable();
       } catch (e) {
         showToast('Failed to load pages', 'error');
+      }
+    }
+
+    async function loadTokens() {
+      try {
+        const res = await fetch('/api/admin/tokens');
+        const data = await res.json();
+        tokens = data.tokens || [];
+        document.getElementById('totalTokens').textContent = tokens.length;
+        renderTokenTable();
+      } catch (e) {
+        showToast('Failed to load tokens', 'error');
       }
     }
 
@@ -384,6 +467,56 @@ function getAdminHtml(config: ServerConfig): string {
           </td>
         </tr>\`;
       }).join('');
+    }
+
+    function renderTokenTable() {
+      const tbody = document.getElementById('tokenTable');
+      const empty = document.getElementById('emptyTokens');
+      if (tokens.length === 0) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      tbody.innerHTML = tokens.map(t => {
+        const created = new Date(t.createdAt).toLocaleDateString();
+        const lastUsed = t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleString() : '-';
+        return \`<tr>
+          <td><strong>\${escapeHtml(t.name)}</strong></td>
+          <td><code style="background:#f5f5f5;padding:2px 8px;border-radius:4px;font-size:12px;cursor:pointer;" onclick="copyToken('\${t.token}')" title="Click to copy">\${t.token.substring(0, 8)}...</code></td>
+          <td>\${created}</td>
+          <td>\${lastUsed}</td>
+          <td><button class="btn btn-danger" onclick="deleteToken('\${t.id}')">Delete</button></td>
+        </tr>\`;
+      }).join('');
+    }
+
+    function copyToken(token) {
+      navigator.clipboard.writeText(token).then(() => showToast('Token copied!', 'success'));
+    }
+
+    async function createToken() {
+      const name = prompt('Token name (optional):');
+      if (name === null) return;
+      try {
+        const res = await fetch('/api/admin/tokens', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        showToast('Token created: ' + data.token, 'success');
+        loadTokens();
+      } catch (e) { showToast('Failed to create token', 'error'); }
+    }
+
+    async function deleteToken(id) {
+      if (!confirm('Delete this token? Existing clients using it will lose access.')) return;
+      try {
+        await fetch('/api/admin/tokens/' + id, { method: 'DELETE' });
+        showToast('Token deleted', 'success');
+        loadTokens();
+      } catch (e) { showToast('Failed to delete token', 'error'); }
     }
 
     function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -436,6 +569,7 @@ function getAdminHtml(config: ServerConfig): string {
     }
 
     loadPages();
+    loadTokens();
   </script>
 </body>
 </html>`;

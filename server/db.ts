@@ -1,7 +1,7 @@
 import initSqlJs, { type Database } from "sql.js";
 import fs from "fs";
 import path from "path";
-import type { DeployedPage } from "../shared/types.js";
+import type { DeployedPage, AuthToken } from "../shared/types.js";
 
 export class PagesDatabase {
   private db: Database | null = null;
@@ -44,6 +44,15 @@ export class PagesDatabase {
         file_count INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
+      )
+    `);
+    this.db!.exec(`
+      CREATE TABLE IF NOT EXISTS auth_tokens (
+        id TEXT PRIMARY KEY,
+        token TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        last_used_at TEXT
       )
     `);
   }
@@ -161,6 +170,75 @@ export class PagesDatabase {
       fileCount: row.file_count,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+    };
+  }
+
+  // ─── Auth Token CRUD ─────────────────────────────────
+
+  async createToken(token: AuthToken): Promise<void> {
+    const db = await this.ensureDb();
+    db.run(
+      `INSERT INTO auth_tokens (id, token, name, created_at, last_used_at) VALUES (?, ?, ?, ?, ?)`,
+      [token.id, token.token, token.name, token.createdAt, token.lastUsedAt ?? null]
+    );
+    this.save();
+  }
+
+  async getTokenByValue(tokenValue: string): Promise<AuthToken | undefined> {
+    const db = await this.ensureDb();
+    const stmt = db.prepare(`SELECT * FROM auth_tokens WHERE token = ?`);
+    stmt.bind([tokenValue]);
+    if (stmt.step()) {
+      const row = stmt.getAsObject() as any;
+      stmt.free();
+      return this.rowToAuthToken(row);
+    }
+    stmt.free();
+    return undefined;
+  }
+
+  async listTokens(): Promise<AuthToken[]> {
+    const db = await this.ensureDb();
+    const stmt = db.prepare(`SELECT * FROM auth_tokens ORDER BY created_at DESC`);
+    const tokens: AuthToken[] = [];
+    while (stmt.step()) {
+      tokens.push(this.rowToAuthToken(stmt.getAsObject() as any));
+    }
+    stmt.free();
+    return tokens;
+  }
+
+  async deleteToken(id: string): Promise<boolean> {
+    const db = await this.ensureDb();
+    db.run(`DELETE FROM auth_tokens WHERE id = ?`, [id]);
+    const changes = db.getRowsModified();
+    this.save();
+    return changes > 0;
+  }
+
+  async updateTokenLastUsed(tokenValue: string): Promise<void> {
+    const db = await this.ensureDb();
+    db.run(`UPDATE auth_tokens SET last_used_at = ? WHERE token = ?`, [new Date().toISOString(), tokenValue]);
+    this.save();
+  }
+
+  async tokenExists(tokenValue: string): Promise<boolean> {
+    const db = await this.ensureDb();
+    const stmt = db.prepare(`SELECT COUNT(*) as cnt FROM auth_tokens WHERE token = ?`);
+    stmt.bind([tokenValue]);
+    stmt.step();
+    const count = (stmt.getAsObject() as any).cnt as number;
+    stmt.free();
+    return count > 0;
+  }
+
+  private rowToAuthToken(row: any): AuthToken {
+    return {
+      id: row.id,
+      token: row.token,
+      name: row.name,
+      createdAt: row.created_at,
+      lastUsedAt: row.last_used_at || undefined,
     };
   }
 

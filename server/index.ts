@@ -3,6 +3,7 @@ import os from "os";
 import { createApp } from "./app.js";
 import { createMcpHandler } from "./mcp-endpoint.js";
 import { bearerAuth } from "./auth.js";
+import { nanoid } from "nanoid";
 import type { ServerConfig } from "../shared/types.js";
 
 function loadConfig(): ServerConfig {
@@ -10,7 +11,7 @@ function loadConfig(): ServerConfig {
   const domain = process.env.DOMAIN || `http://localhost:${port}`;
   const adminUsername = process.env.ADMIN_USERNAME || "admin";
   const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
-  const authToken = process.env.AUTH_TOKEN || "my-secret-token";
+  const authToken = process.env.AUTH_TOKEN || "";
   const dbPath = process.env.DB_PATH || path.join(os.homedir(), ".pages-mcp", "pages.db");
   const storagePath = process.env.STORAGE_PATH || path.join(os.homedir(), ".pages-mcp", "storage");
 
@@ -30,7 +31,7 @@ export function startServer(config?: Partial<ServerConfig>) {
   console.log(``);
 
   const { app, db, storage } = createApp(fullConfig);
-  const mcpAuth = bearerAuth(fullConfig.authToken);
+  const mcpAuth = bearerAuth(db);
   const mcpHandler = createMcpHandler(fullConfig, db, storage);
 
   // Mount MCP endpoint
@@ -39,6 +40,25 @@ export function startServer(config?: Partial<ServerConfig>) {
   const server = app.listen(fullConfig.port, () => {
     console.log(`✅ Server running at http://localhost:${fullConfig.port}`);
   });
+
+  // Seed initial tokens from environment variable
+  if (fullConfig.authToken) {
+    const tokens = fullConfig.authToken.split(",").map(t => t.trim()).filter(Boolean);
+    (async () => {
+      for (const tokenValue of tokens) {
+        const exists = await db.tokenExists(tokenValue);
+        if (!exists) {
+          await db.createToken({
+            id: nanoid(),
+            token: tokenValue,
+            name: `Env Token (${tokenValue.substring(0, 8)}...)`,
+            createdAt: new Date().toISOString(),
+          });
+          console.log(`🔑 Seeded token from env: ${tokenValue.substring(0, 8)}...`);
+        }
+      }
+    })();
+  }
 
   return { server, app, db, storage };
 }

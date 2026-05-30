@@ -83,6 +83,15 @@ export interface ListPagesResponse {
   total: number;
 }
 
+/** An API auth token */
+export interface AuthToken {
+  id: string;
+  token: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
 /** Error response */
 export interface ErrorResponse {
   error: string;
