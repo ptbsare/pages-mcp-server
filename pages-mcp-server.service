@@ -7,8 +7,9 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
+WorkingDirectory=/root/pages-mcp-server
 
-ExecStart=/usr/bin/npx -y github:ptbsare/pages-mcp-server server --port 3000 --domain http://localhost:3000 --admin-user admin --admin-pass changeme
+ExecStart=/usr/bin/node /root/pages-mcp-server/dist/cli.js server --port 3000 --domain http://localhost:3000 --admin-user admin --admin-pass changeme
 
 Environment=PORT=3000
 Environment=DOMAIN=http://localhost:3000
