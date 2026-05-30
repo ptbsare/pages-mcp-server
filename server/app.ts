@@ -391,7 +391,9 @@ function getAdminHtml(config: ServerConfig): string {
 
     /* ─── Tables ─────────────────────────────────────────── */
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table { width: 100%; border-collapse: collapse; min-width: 500px; }
+    table { width: 100%; border-collapse: collapse; }
+    .token-table table { min-width: 380px; }
+    .pages-table table { min-width: 420px; }
     th { text-align: left; padding: 10px 14px; background: var(--bg3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); border-bottom: 1px solid var(--border); white-space: nowrap; }
     td { padding: 10px 14px; border-bottom: 1px solid var(--border2); font-size: 13px; vertical-align: middle; }
     tr:hover { background: var(--bg3); }
@@ -439,8 +441,8 @@ function getAdminHtml(config: ServerConfig): string {
     .toast-error { background: #ef4444; }
 
     /* ─── Token cell ─────────────────────────────────────── */
-    .token-cell { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    .token-cell code { background: var(--bg4); padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; user-select: all; word-break: break-all; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .token-cell { display: flex; align-items: center; gap: 6px; }
+    .token-cell code { background: var(--bg4); padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; user-select: all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; flex-shrink: 1; }
     .token-cell code:hover { filter: brightness(0.92); }
 
     /* ─── OTP ────────────────────────────────────────────── */
@@ -488,7 +490,9 @@ function getAdminHtml(config: ServerConfig): string {
       .card-header h2 { font-size: 18px; }
       th { padding: 12px 20px; font-size: 12px; }
       td { padding: 12px 20px; font-size: 14px; }
-      .token-cell code { font-size: 12px; max-width: none; }
+      .token-cell code { font-size: 12px; max-width: 200px; }
+      .token-table table { min-width: 500px; }
+      .pages-table table { min-width: 500px; }
       .otp-qr canvas, .otp-qr img { max-width: 200px !important; }
       .otp-secret { font-size: 14px; padding: 8px 12px; }
       .modal { padding: 32px; }
@@ -527,20 +531,24 @@ function getAdminHtml(config: ServerConfig): string {
     <!-- Pages -->
     <div class="card">
       <div class="card-header"><h2>📄 Deployed Pages</h2></div>
-      <table>
-        <thead><tr><th>Name</th><th>Share URL</th><th>Files</th><th>Created</th><th>Actions</th></tr></thead>
-        <tbody id="pageTable"></tbody>
-      </table>
+      <div class="table-wrap">
+        <table class="pages-table">
+          <thead><tr><th>Name</th><th>Share URL</th><th>Files</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id="pageTable"></tbody>
+        </table>
+      </div>
       <div class="empty" id="emptyState" style="display:none;">No pages deployed yet.</div>
     </div>
 
     <!-- Tokens -->
     <div class="card">
       <div class="card-header"><h2>🔑 API Tokens</h2><button class="btn btn-primary" onclick="createToken()">+ New Token</button></div>
-      <table>
-        <thead><tr><th>Name</th><th>Token</th><th>Created</th><th class="hide-sm">Last Used</th><th class="token-actions">Actions</th></tr></thead>
-        <tbody id="tokenTable"></tbody>
-      </table>
+      <div class="table-wrap">
+        <table class="token-table">
+          <thead><tr><th>Name</th><th>Token</th><th>Created</th><th class="hide-sm">Last Used</th><th class="token-actions">Actions</th></tr></thead>
+          <tbody id="tokenTable"></tbody>
+        </table>
+      </div>
       <div class="empty" id="emptyTokens" style="display:none;">No API tokens yet. Create one to use the MCP / Deploy API.</div>
     </div>
   </div>
