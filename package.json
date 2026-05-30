@@ -1,8 +1,30 @@
 {
   "name": "pages-mcp-server",
   "version": "1.0.0",
-  "description": "Self-hosted MCP server for deploying and managing static websites via EdgeOne Pages-like platform",
+  "description": "Self-hosted MCP server for deploying and managing static websites",
   "type": "module",
+  "license": "GPL-3.0-or-later",
+  "author": "ptbsare",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ptbsare/pages-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ptbsare/pages-mcp-server/issues"
+  },
+  "homepage": "https://github.com/ptbsare/pages-mcp-server#readme",
+  "keywords": [
+    "mcp",
+    "static-site",
+    "deploy",
+    "edgeone",
+    "pages",
+    "model-context-protocol"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "bin": {
     "pages-mcp": "./dist/cli.js"
   },
@@ -14,6 +36,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "prepare": "npm run build",
     "dev:server": "tsx server/index.ts",
     "dev:client": "tsx client/src/cli.ts",
     "docker:build": "docker build -t pages-mcp-server .",
@@ -27,7 +50,8 @@
     "nanoid": "^5.1.5",
     "mime-types": "^2.1.35",
     "basic-auth": "^2.0.1",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "typescript": "^5.6.0"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.5",
@@ -37,7 +61,6 @@
     "@types/basic-auth": "^1.1.8",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20",
-    "typescript": "^5.6.0",
     "tsx": "^4.19.0"
   },
   "engines": {

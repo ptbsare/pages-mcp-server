@@ -1,0 +1,25 @@
+node_modules/
+.git/
+.github/
+.env
+*.db
+storage/
+.DS_Store
+*.tsbuildinfo
+tsconfig.json
+vitest.config.ts
+
+# Source files — only dist/ is needed
+*.ts
+!*.d.ts
+src/
+client/src/
+server/
+shared/
+
+# Dev files
+.prettierrc
+.eslintrc
+.gitignore
+docker-compose.yml
+pages-mcp-server.service
