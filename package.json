@@ -50,7 +50,7 @@
     "nanoid": "^5.1.5",
     "mime-types": "^2.1.35",
     "basic-auth": "^2.0.1",
-    "jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
