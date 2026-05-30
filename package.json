@@ -1,0 +1,46 @@
+{
+  "name": "pages-mcp-server",
+  "version": "1.0.0",
+  "description": "Self-hosted MCP server for deploying and managing static websites via EdgeOne Pages-like platform",
+  "type": "module",
+  "bin": {
+    "pages-mcp": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./server": "./dist/server/index.js",
+    "./client": "./dist/client/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev:server": "tsx server/index.ts",
+    "dev:client": "tsx client/src/cli.ts",
+    "docker:build": "docker build -t pages-mcp-server .",
+    "docker:run": "docker run -p 3000:3000 pages-mcp-server"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "adm-zip": "^0.5.16",
+    "express": "^4.21.0",
+    "sql.js": "^1.11.0",
+    "nanoid": "^5.1.5",
+    "mime-types": "^2.1.35",
+    "basic-auth": "^2.0.1",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/express": "^4.17.21",
+    "@types/sql.js": "^1.4.9",
+    "@types/mime-types": "^2.1.4",
+    "@types/basic-auth": "^1.1.8",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^20",
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

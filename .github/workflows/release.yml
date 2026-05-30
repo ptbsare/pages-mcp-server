@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get previous tag
+        id: get_prev_tag
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          echo "PREV_TAG=$PREV_TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          PREV_TAG="${{ steps.get_prev_tag.outputs.PREV_TAG }}"
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+
+          add_section() {
+            local title="$1"
+            local emoji="$2"
+            local pattern="$3"
+            local commits
+            commits=$(git log --pretty=format:"- %s ([%h](https://github.com/${{ github.repository }}/commit/%H))" ${PREV_TAG}..HEAD --grep="$pattern" 2>/dev/null)
+            if [ -n "$commits" ]; then
+              echo "## ${emoji} ${title}" >> $GITHUB_OUTPUT
+              echo "$commits" >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
+            fi
+          }
+
+          add_section "新功能 (Features)" "🚀" "^feat"
+          add_section "修复 (Bug Fixes)" "🐛" "^fix"
+          add_section "文档 (Documentation)" "📚" "^docs"
+          add_section "性能优化 (Performance)" "⚡" "^perf"
+          add_section "重构 (Refactoring)" "♻️" "^refactor"
+          add_section "测试 (Tests)" "🧪" "^test"
+          add_section "构建系统 (Build System)" "🔧" "^build"
+          add_section "持续集成 (CI)" "👷" "^ci"
+          add_section "维护 (Maintenance)" "🔨" "^chore"
+
+          OTHER_COMMITS=$(git log --pretty=format:"- %s ([%h](https://github.com/${{ github.repository }}/commit/%H))" ${PREV_TAG}..HEAD --invert-grep --grep="^feat\|^fix\|^docs\|^perf\|^refactor\|^test\|^build\|^ci\|^chore" 2>/dev/null)
+          if [ -n "$OTHER_COMMITS" ]; then
+            echo "## 📦 其他变更 (Other Changes)" >> $GITHUB_OUTPUT
+            echo "$OTHER_COMMITS" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+          fi
+
+          echo "---" >> $GITHUB_OUTPUT
+          echo "**完整变更日志**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}

@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  pages-mcp:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DOMAIN=http://localhost:3000
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=changeme
+      - AUTH_TOKEN=my-secret-token
+      - DB_PATH=/data/db/pages.db
+      - STORAGE_PATH=/data/storage
+    volumes:
+      - pages-data:/data
+    restart: unless-stopped
+
+volumes:
+  pages-data:
