@@ -689,8 +689,9 @@ export function createApp(config: ServerConfig) {
   app.post("/api/admin/shares/:shareId/lock", adminAuth, csrfProtection, adminLimiter, async (req: Request, res: Response) => {
     try {
       const { locked } = req.body;
-      const ok = storage.setShareLock(req.params.shareId, !!locked);
-      if (!ok) { res.status(404).json({ error: "Share not found" }); return; }
+      const page = await db.getPageByShareId(req.params.shareId);
+      if (!page) { res.status(404).json({ error: "Share not found" }); return; }
+      await db.updatePage(page.id, { locked: !!locked });
       res.json({ success: true, locked: !!locked });
     } catch (err: any) {
       res.status(500).json({ error: "Internal server error" });

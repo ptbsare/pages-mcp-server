@@ -344,13 +344,6 @@ export class FileStorage {
         }
         return size;
     }
-    /** Lock or unlock a page (prevents auto-cleanup when locked). Uses database. */
-    setShareLock(shareId, locked) {
-        const pageDir = this.getPageDir(shareId);
-        if (!fs.existsSync(pageDir))
-            return false;
-        return true;
-    }
     addToZip(zip, dirPath, zipPath) {
         const entries = fs.readdirSync(dirPath, { withFileTypes: true });
         for (const entry of entries) {

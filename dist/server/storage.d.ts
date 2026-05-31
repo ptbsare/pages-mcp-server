@@ -82,8 +82,6 @@ export declare class FileStorage {
      */
     /** Calculate total size of a directory */
     private calculateDirSize;
-    /** Lock or unlock a page (prevents auto-cleanup when locked). Uses database. */
-    setShareLock(shareId: string, locked: boolean): boolean;
     private addToZip;
     /**
      * Get share metadata.
