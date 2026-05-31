@@ -95,14 +95,10 @@ export class PagesMcpHttpClient {
             // Single file: read and upload
             const fileName = path.basename(localPath);
             const content = fs.readFileSync(localPath);
-            const formData = new FormData();
-            formData.append("file", new Blob([content]), fileName);
-            if (name)
-                formData.append("name", name);
-            const resp = await fetch(`${this.baseUrl}/api/deploy/file`, {
+            const resp = await fetch(`${this.baseUrl}/api/deploy/file?filename=${encodeURIComponent(fileName)}&name=${encodeURIComponent(name || "")}`, {
                 method: "POST",
-                headers: { Authorization: `Bearer ${this.authToken}` },
-                body: formData,
+                headers: { Authorization: `Bearer ${this.authToken}`, "Content-Type": "application/octet-stream" },
+                body: content,
             });
             if (!resp.ok)
                 throw new Error(`Upload failed: ${resp.status}`);
@@ -120,27 +116,24 @@ export class PagesMcpHttpClient {
                         continue;
                     if (e.isDirectory())
                         addDir(sp, zipPath + e.name + "/");
-                    else
-                        zip.addLocalFile(sp, zipPath + e.name);
+                    else {
+                        const content = fs.readFileSync(sp);
+                        zip.addFile(zipPath + e.name, content);
+                    }
                 }
             };
             addDir(localPath, "");
             const zipBuffer = zip.toBuffer();
             const zipName = (name || path.basename(localPath)) + ".zip";
-            const formData = new FormData();
-            formData.append("file", new Blob([zipBuffer]), zipName);
-            if (name)
-                formData.append("name", name);
-            const resp = await fetch(`${this.baseUrl}/api/deploy/file`, {
+            const resp = await fetch(`${this.baseUrl}/api/deploy/file?filename=${encodeURIComponent(zipName)}&name=${encodeURIComponent(name || "")}`, {
                 method: "POST",
-                headers: { Authorization: `Bearer ${this.authToken}` },
-                body: formData,
+                headers: { Authorization: `Bearer ${this.authToken}`, "Content-Type": "application/octet-stream" },
+                body: zipBuffer,
             });
             if (!resp.ok)
                 throw new Error(`Upload failed: ${resp.status}`);
             const data = await resp.json();
-            const data2 = await resp.json();
-            return `✅ Folder shared!\n\nShare page: ${data2.url}\nFiles: ${data2.fileCount}\nTotal size: ${data2.totalSize} bytes`;
+            return `✅ Folder shared!\n\nShare page: ${data.url}\nFiles: ${data.fileCount}\nTotal size: ${data.totalSize} bytes`;
         }
         throw new Error("Path is neither a file nor a directory");
     }

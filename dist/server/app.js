@@ -378,47 +378,12 @@ export function createApp(config) {
         }
     });
     // ─── File Upload API (for local stdio client) ──────────
-    const uploadAuth = basicAuth(config.adminUsername, config.adminPassword);
-    app.post("/api/deploy/file", uploadAuth, deployBodyParser, async (req, res) => {
+    app.post("/api/deploy/file", bearerAuth(db), express.raw({ limit: "1gb", type: "*/*" }), async (req, res) => {
         try {
-            const contentType = req.headers["content-type"] || "";
-            let fileName;
-            let fileBuffer;
-            if (contentType.includes("multipart/form-data")) {
-                const chunks = [];
-                await new Promise((resolve, reject) => {
-                    req.on("data", (chunk) => chunks.push(chunk));
-                    req.on("end", () => resolve());
-                    req.on("error", reject);
-                });
-                const body = Buffer.concat(chunks);
-                const dispMatch = contentType.match(/filename="([^"]+)"/);
-                fileName = dispMatch ? dispMatch[1] : `upload-${Date.now()}`;
-                const boundary = contentType.match(/boundary=(.+)/)?.[1];
-                if (boundary) {
-                    const parts = body.toString().split(`--${boundary}`);
-                    const filePart = parts.find(p => p.includes("Content-Disposition"));
-                    if (filePart) {
-                        const headerEnd = filePart.indexOf("\r\n\r\n");
-                        if (headerEnd > 0)
-                            fileBuffer = Buffer.from(filePart.substring(headerEnd + 4, filePart.length - 2));
-                    }
-                }
-                if (!fileBuffer)
-                    throw new Error("Could not parse uploaded file");
-            }
-            else {
-                const chunks = [];
-                await new Promise((resolve, reject) => {
-                    req.on("data", (chunk) => chunks.push(chunk));
-                    req.on("end", () => resolve());
-                    req.on("error", reject);
-                });
-                fileBuffer = Buffer.concat(chunks);
-                fileName = String(req.query.filename || `upload-${Date.now()}`);
-            }
-            const name = String(req.query.name || "") || undefined;
+            const fileBuffer = req.body;
+            const fileName = String(req.query.filename || `upload-${Date.now()}`);
             const isZip = fileName.toLowerCase().endsWith(".zip");
+            const name = String(req.query.name || "") || undefined;
             if (isZip) {
                 const AdmZip = (await import("adm-zip")).default;
                 const zip = new AdmZip(fileBuffer);

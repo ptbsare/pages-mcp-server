@@ -153,6 +153,8 @@ export function createMcpHandler(config, db, storage) {
                     });
                     triggerCleanup(storage);
                     return;
+                }
+                if (name === "list_pages") {
                     const { limit = 50, offset = 0 } = args;
                     const result = await db.listPages(limit, offset);
                     if (result.pages.length === 0) {
