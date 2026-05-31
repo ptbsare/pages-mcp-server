@@ -79,6 +79,30 @@ export class FileStorage {
     return { fileCount: files.length, hasIndex };
   }
 
+  /** Blocked sensitive directory prefixes (SSRF prevention) */
+  private static readonly BLOCKED_PATHS = [
+    "/etc", "/root", "/home",
+    "/proc", "/sys", "/dev", "/boot",
+    "/bin", "/sbin", "/lib", "/lib64",
+    "/usr/bin", "/usr/sbin", "/usr/lib", "/usr/lib64",
+    "/var/log", "/var/spool", "/var/mail",
+    "C:\\Windows", "C:\\Program Files", "C:\\ProgramData",
+  ];
+
+  /**
+   * Validate that folderPath is not a sensitive system directory.
+   * Called before storeFolder to prevent SSRF via deploy_folder MCP tool.
+   */
+  static validateFolderPath(folderPath: string): { valid: boolean; error?: string } {
+    const resolved = path.resolve(folderPath);
+    for (const blocked of FileStorage.BLOCKED_PATHS) {
+      if (resolved === blocked || resolved.startsWith(blocked + path.sep)) {
+        return { valid: false, error: `Access denied: path '${folderPath}' is not allowed` };
+      }
+    }
+    return { valid: true };
+  }
+
   /** Copy a local folder's contents into the page directory */
   storeFolder(shareId: string, folderPath: string): { fileCount: number; hasIndex: boolean } {
     const dir = this.getPageDir(shareId);

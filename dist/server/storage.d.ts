@@ -10,6 +10,16 @@ export declare class FileStorage {
         fileCount: number;
         hasIndex: boolean;
     };
+    /** Blocked sensitive directory prefixes (SSRF prevention) */
+    private static readonly BLOCKED_PATHS;
+    /**
+     * Validate that folderPath is not a sensitive system directory.
+     * Called before storeFolder to prevent SSRF via deploy_folder MCP tool.
+     */
+    static validateFolderPath(folderPath: string): {
+        valid: boolean;
+        error?: string;
+    };
     /** Copy a local folder's contents into the page directory */
     storeFolder(shareId: string, folderPath: string): {
         fileCount: number;

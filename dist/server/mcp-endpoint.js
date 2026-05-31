@@ -1,3 +1,4 @@
+import { FileStorage } from "./storage.js";
 import { buildUrl } from "../shared/types.js";
 import { nanoid } from "nanoid";
 /**
@@ -165,6 +166,19 @@ export function createMcpHandler(config, db, storage) {
                             id: body.id,
                             result: {
                                 content: [{ type: "text", text: "Error: Missing required argument: path" }],
+                                isError: true,
+                            },
+                        });
+                        return;
+                    }
+                    // SSRF prevention: block sensitive system directories
+                    const pathCheck = FileStorage.validateFolderPath(folderPath);
+                    if (!pathCheck.valid) {
+                        res.json({
+                            jsonrpc: "2.0",
+                            id: body.id,
+                            result: {
+                                content: [{ type: "text", text: `Error: ${pathCheck.error}` }],
                                 isError: true,
                             },
                         });

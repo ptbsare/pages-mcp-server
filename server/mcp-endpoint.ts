@@ -187,6 +187,20 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
             return;
           }
 
+          // SSRF prevention: block sensitive system directories
+          const pathCheck = FileStorage.validateFolderPath(folderPath);
+          if (!pathCheck.valid) {
+            res.json({
+              jsonrpc: "2.0",
+              id: body.id,
+              result: {
+                content: [{ type: "text", text: `Error: ${pathCheck.error}` }],
+                isError: true,
+              },
+            });
+            return;
+          }
+
           const fs = await import("fs");
           if (!fs.existsSync(folderPath)) {
             res.json({
