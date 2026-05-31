@@ -280,6 +280,27 @@ export class FileStorage {
         return { shareId, fileName, fileSize: stat.size };
     }
     /**
+     * Deploy a file from buffer (for HTTP upload).
+     */
+    deployFileFromBuffer(buffer, fileName, name) {
+        const MAX_SIZE = 1024 * 1024 * 1024; // 1GB
+        if (buffer.length > MAX_SIZE) {
+            throw new Error(`File too large (${buffer.length} bytes). Max: ${MAX_SIZE} bytes`);
+        }
+        const shareId = nanoid(12);
+        const dir = this.getPageDir(shareId);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, fileName), buffer);
+        fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
+            type: "file",
+            fileName,
+            fileSize: buffer.length,
+            createdAt: new Date().toISOString(),
+            locked: false,
+        }));
+        return { shareId, fileName, fileCount: 1, fileSize: buffer.length };
+    }
+    /**
      * Deploy a folder for sharing (preserves directory structure).
      * Returns the share ID.
      */

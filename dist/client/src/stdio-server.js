@@ -87,6 +87,24 @@ export async function startStdioServer(remoteUrl, authToken) {
                         required: ["id"],
                     },
                 },
+                {
+                    name: "deploy_file",
+                    description: "Share a local file or folder to the remote server. For a single file, returns a direct download link. For a folder, preserves nested directory structure and returns a share page URL with browse, individual download, zip download, and upload capabilities. Supports drag-and-drop style file sharing.",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            path: {
+                                type: "string",
+                                description: "Absolute path to the local file or folder to share.",
+                            },
+                            name: {
+                                type: "string",
+                                description: "Optional display name for the share.",
+                            },
+                        },
+                        required: ["path"],
+                    },
+                },
             ],
         };
     });
@@ -114,6 +132,11 @@ export async function startStdioServer(remoteUrl, authToken) {
                 case "delete_page": {
                     const { id } = args;
                     text = await client.deletePage(id);
+                    break;
+                }
+                case "deploy_file": {
+                    const { path, name } = args;
+                    text = await client.deployFile(path, name);
                     break;
                 }
                 default:

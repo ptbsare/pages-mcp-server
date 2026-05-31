@@ -377,6 +377,79 @@ export function createApp(config) {
             res.send(zip.toBuffer());
         }
     });
+    // ─── File Upload API (for local stdio client) ──────────
+    const uploadAuth = basicAuth(config.adminUsername, config.adminPassword);
+    app.post("/api/deploy/file", uploadAuth, deployBodyParser, async (req, res) => {
+        try {
+            const contentType = req.headers["content-type"] || "";
+            let fileName;
+            let fileBuffer;
+            if (contentType.includes("multipart/form-data")) {
+                const chunks = [];
+                await new Promise((resolve, reject) => {
+                    req.on("data", (chunk) => chunks.push(chunk));
+                    req.on("end", () => resolve());
+                    req.on("error", reject);
+                });
+                const body = Buffer.concat(chunks);
+                const dispMatch = contentType.match(/filename="([^"]+)"/);
+                fileName = dispMatch ? dispMatch[1] : `upload-${Date.now()}`;
+                const boundary = contentType.match(/boundary=(.+)/)?.[1];
+                if (boundary) {
+                    const parts = body.toString().split(`--${boundary}`);
+                    const filePart = parts.find(p => p.includes("Content-Disposition"));
+                    if (filePart) {
+                        const headerEnd = filePart.indexOf("\r\n\r\n");
+                        if (headerEnd > 0)
+                            fileBuffer = Buffer.from(filePart.substring(headerEnd + 4, filePart.length - 2));
+                    }
+                }
+                if (!fileBuffer)
+                    throw new Error("Could not parse uploaded file");
+            }
+            else {
+                const chunks = [];
+                await new Promise((resolve, reject) => {
+                    req.on("data", (chunk) => chunks.push(chunk));
+                    req.on("end", () => resolve());
+                    req.on("error", reject);
+                });
+                fileBuffer = Buffer.concat(chunks);
+                fileName = String(req.query.filename || `upload-${Date.now()}`);
+            }
+            const name = String(req.query.name || "") || undefined;
+            const isZip = fileName.toLowerCase().endsWith(".zip");
+            if (isZip) {
+                const AdmZip = (await import("adm-zip")).default;
+                const zip = new AdmZip(fileBuffer);
+                const shareId = nanoid(12);
+                const dir = path.join(config.storagePath, shareId);
+                fs.mkdirSync(dir, { recursive: true });
+                zip.extractAllTo(dir, true);
+                const fileCount = storage.listFiles(dir).length;
+                const totalSize = storage.getDirSize(dir);
+                fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
+                    type: "folder", folderName: name || path.basename(fileName, ".zip"),
+                    fileCount, totalSize, createdAt: new Date().toISOString(), locked: false,
+                }));
+                const publicUrl = buildUrl(config.domain, config.outPort);
+                res.json({ success: true, shareId, url: `${publicUrl}/f/${shareId}`, fileCount, totalSize });
+            }
+            else {
+                const result = storage.deployFileFromBuffer(fileBuffer, fileName, name);
+                const publicUrl = buildUrl(config.domain, config.outPort);
+                const dlUrl = `${publicUrl}/f/${result.shareId}/raw/${encodeURIComponent(result.fileName)}`;
+                res.json({ success: true, shareId: result.shareId, url: dlUrl, fileName: result.fileName, fileSize: result.fileSize });
+            }
+            const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
+            if (expireDays > 0)
+                setImmediate(() => storage.cleanupExpired(expireDays));
+        }
+        catch (err) {
+            console.error("Upload error:", err);
+            res.status(500).json({ error: err.message });
+        }
+    });
     app.get("/f/:shareId/raw/**", async (req, res) => {
         const { shareId } = req.params;
         if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {

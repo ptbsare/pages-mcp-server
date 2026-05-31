@@ -80,29 +80,6 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
                 },
               },
               {
-                name: "deploy_folder",
-                description:
-                  "Deploy a local folder containing a static website (must include index.html). Returns a shareable URL.",
-                inputSchema: {
-                  type: "object",
-                  properties: {
-                    path: {
-                      type: "string",
-                      description: "Absolute path to the local folder to deploy.",
-                    },
-                    name: {
-                      type: "string",
-                      description: "Optional human-readable name for the page.",
-                    },
-                    description: {
-                      type: "string",
-                      description: "Optional description for the page.",
-                    },
-                  },
-                  required: ["path"],
-                },
-              },
-              {
                 name: "list_pages",
                 description: "List all deployed pages.",
                 inputSchema: {
@@ -133,25 +110,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
                   required: ["id"],
                 },
               },
-              {
-                name: "deploy_file",
-                description:
-                  "Share a file or folder. For a single file, returns a direct download link. For a folder, packs all files into a zip and returns a shareable URL with preview. Supports image preview, text preview, and download.",
-                inputSchema: {
-                  type: "object",
-                  properties: {
-                    path: {
-                      type: "string",
-                      description: "Absolute path to the file or folder to share.",
-                    },
-                    name: {
-                      type: "string",
-                      description: "Optional display name for the share.",
-                    },
-                  },
-                  required: ["path"],
-                },
-              },
+
             ],
           },
         });
@@ -207,142 +166,6 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
           });
           triggerCleanup(storage);
           return;
-        }
-
-        if (name === "deploy_folder") {
-          const { path: folderPath, name: pageName, description } = args as any;
-          if (!folderPath) {
-            res.json({
-              jsonrpc: "2.0",
-              id: body.id,
-              result: {
-                content: [{ type: "text", text: "Error: Missing required argument: path" }],
-                isError: true,
-              },
-            });
-            return;
-          }
-
-          // SSRF prevention: block sensitive system directories
-          const pathCheck = FileStorage.validateFolderPath(folderPath);
-          if (!pathCheck.valid) {
-            res.json({
-              jsonrpc: "2.0",
-              id: body.id,
-              result: {
-                content: [{ type: "text", text: `Error: ${pathCheck.error}` }],
-                isError: true,
-              },
-            });
-            return;
-          }
-
-          const fs = await import("fs");
-          if (!fs.existsSync(folderPath)) {
-            res.json({
-              jsonrpc: "2.0",
-              id: body.id,
-              result: {
-                content: [{ type: "text", text: `Error: Folder not found: ${folderPath}` }],
-                isError: true,
-              },
-            });
-            return;
-          }
-
-          const shareId = nanoid(12);
-          const id = nanoid();
-          const now = new Date().toISOString();
-
-          const result = storage.storeFolder(shareId, folderPath);
-
-          if (!result.hasIndex) {
-            storage.deletePage(shareId);
-            res.json({
-              jsonrpc: "2.0",
-              id: body.id,
-              result: {
-                content: [
-                  {
-                    type: "text",
-                    text: "Error: Folder must contain an index.html file at the root.",
-                  },
-                ],
-                isError: true,
-              },
-            });
-            return;
-          }
-
-          await db.createPage({
-            id,
-            shareId,
-            name: pageName || `Page ${shareId}`,
-            description,
-            fileCount: result.fileCount,
-            createdAt: now,
-            updatedAt: now,
-          });
-
-          const url = `${buildUrl(config.domain, config.outPort)}/s/${shareId}`;
-          res.json({
-            jsonrpc: "2.0",
-            id: body.id,
-            result: {
-              content: [
-                {
-                  type: "text",
-                  text: `✅ Folder deployed successfully!\n\nURL: ${url}\nID: ${id}\nShare ID: ${shareId}\nFiles: ${result.fileCount}`,
-                },
-              ],
-            },
-          });
-          triggerCleanup(storage);
-          return;
-        }
-
-        if (name === "deploy_file") {
-          const { path: filePath, name: shareName } = args as any;
-          if (!filePath) {
-            res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "Error: Missing required argument: path" }], isError: true } });
-            return;
-          }
-          try {
-            const fs = await import("fs");
-            const path = await import("path");
-            // SSRF prevention: block sensitive system directories
-            const pathCheck = FileStorage.validateFolderPath(filePath);
-            if (!pathCheck.valid) {
-              res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `Error: ${pathCheck.error}` }], isError: true } });
-              return;
-            }
-            if (!fs.existsSync(filePath)) {
-              res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `Error: Path not found: ${filePath}` }], isError: true } });
-              return;
-            }
-            const stat = fs.statSync(filePath);
-            if (stat.isFile()) {
-              // Single file: return direct download link (no share page)
-              const result = storage.deployFile(filePath, shareName);
-              const dlUrl = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}/raw/${encodeURIComponent(result.fileName)}`;
-              res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `✅ File shared!\n\nDirect download: ${dlUrl}\nFile: ${result.fileName}\nSize: ${result.fileSize} bytes` }] } });
-              triggerCleanup(storage);
-            } else if (stat.isDirectory()) {
-              // Folder: return share page URL (browse nested dirs, download individual files, upload, or zip download)
-              const result = storage.deployFolder(filePath, shareName);
-              const shareUrl = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}`;
-              res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `✅ Folder shared!\n\nShare page: ${shareUrl}\nFiles: ${result.fileCount}\nTotal size: ${result.totalSize} bytes` }] } });
-              triggerCleanup(storage);
-            } else {
-              res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "Error: Path is neither a file nor a directory" }], isError: true } });
-            }
-          } catch (err: any) {
-            res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true } });
-          }
-          return;
-        }
-
-        if (name === "list_pages") {
           const { limit = 50, offset = 0 } = args as any;
           const result = await db.listPages(limit, offset);
 

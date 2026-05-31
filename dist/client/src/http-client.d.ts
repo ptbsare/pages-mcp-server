@@ -14,5 +14,10 @@ export declare class PagesMcpHttpClient {
     deployFolder(path: string, name?: string, description?: string): Promise<string>;
     listPages(limit?: number, offset?: number): Promise<string>;
     deletePage(id: string): Promise<string>;
+    /**
+     * Deploy a local file or folder to the remote server.
+     * Reads the file/folder locally, uploads via REST API.
+     */
+    deployFile(localPath: string, name?: string, description?: string): Promise<string>;
 }
 //# sourceMappingURL=http-client.d.ts.map

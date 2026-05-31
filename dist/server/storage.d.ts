@@ -56,6 +56,15 @@ export declare class FileStorage {
         fileSize: number;
     };
     /**
+     * Deploy a file from buffer (for HTTP upload).
+     */
+    deployFileFromBuffer(buffer: Buffer, fileName: string, name?: string): {
+        shareId: string;
+        fileName: string;
+        fileCount: number;
+        fileSize: number;
+    };
+    /**
      * Deploy a folder for sharing (preserves directory structure).
      * Returns the share ID.
      */
@@ -67,7 +76,7 @@ export declare class FileStorage {
     /**
      * Get total size of a directory.
      */
-    private getDirSize;
+    getDirSize(dirPath: string): number;
     private addToZip;
     /**
      * Get share metadata.

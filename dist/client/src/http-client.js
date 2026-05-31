@@ -80,5 +80,69 @@ export class PagesMcpHttpClient {
         });
         return result.content?.[0]?.text || "No response";
     }
+    /**
+     * Deploy a local file or folder to the remote server.
+     * Reads the file/folder locally, uploads via REST API.
+     */
+    async deployFile(localPath, name, description) {
+        const fs = await import("fs");
+        const path = await import("path");
+        if (!fs.existsSync(localPath)) {
+            throw new Error(`Path not found: ${localPath}`);
+        }
+        const stat = fs.statSync(localPath);
+        if (stat.isFile()) {
+            // Single file: read and upload
+            const fileName = path.basename(localPath);
+            const content = fs.readFileSync(localPath);
+            const formData = new FormData();
+            formData.append("file", new Blob([content]), fileName);
+            if (name)
+                formData.append("name", name);
+            const resp = await fetch(`${this.baseUrl}/api/deploy/file`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${this.authToken}` },
+                body: formData,
+            });
+            if (!resp.ok)
+                throw new Error(`Upload failed: ${resp.status}`);
+            const data = await resp.json();
+            return `✅ File shared!\n\nDirect download: ${data.url}\nFile: ${data.fileName}\nSize: ${data.fileSize} bytes`;
+        }
+        else if (stat.isDirectory()) {
+            // Folder: zip and upload
+            const AdmZip = (await import("adm-zip")).default;
+            const zip = new AdmZip();
+            const addDir = (dir, zipPath) => {
+                for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+                    const sp = path.join(dir, e.name);
+                    if (fs.lstatSync(sp).isSymbolicLink())
+                        continue;
+                    if (e.isDirectory())
+                        addDir(sp, zipPath + e.name + "/");
+                    else
+                        zip.addLocalFile(sp, zipPath + e.name);
+                }
+            };
+            addDir(localPath, "");
+            const zipBuffer = zip.toBuffer();
+            const zipName = (name || path.basename(localPath)) + ".zip";
+            const formData = new FormData();
+            formData.append("file", new Blob([zipBuffer]), zipName);
+            if (name)
+                formData.append("name", name);
+            const resp = await fetch(`${this.baseUrl}/api/deploy/file`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${this.authToken}` },
+                body: formData,
+            });
+            if (!resp.ok)
+                throw new Error(`Upload failed: ${resp.status}`);
+            const data = await resp.json();
+            const data2 = await resp.json();
+            return `✅ Folder shared!\n\nShare page: ${data2.url}\nFiles: ${data2.fileCount}\nTotal size: ${data2.totalSize} bytes`;
+        }
+        throw new Error("Path is neither a file nor a directory");
+    }
 }
 //# sourceMappingURL=http-client.js.map
