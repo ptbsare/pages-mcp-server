@@ -186,8 +186,10 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
           const text = result.pages
             .map((p) => {
               const url = `${buildUrl(config.domain, config.outPort)}/s/${p.shareId}`;
-              const lockInfo = p.locked ? " [🔒 Locked]" : "";
-              return `📄 ${p.name}${lockInfo}\n   ID: ${p.id}\n   URL: ${url}\n   Files: ${p.fileCount}\n   Created: ${p.createdAt}`;
+              const lockInfo = p.locked ? " [🔒]" : "";
+              const typeIcon = p.type === "folder" ? "📁" : p.type === "file" ? "📄" : "🌐";
+              const sizeInfo = p.totalSize ? ` (${p.totalSize} bytes)` : "";
+              return `${typeIcon} ${p.name}${lockInfo}${sizeInfo}\n   ID: ${p.id}\n   URL: ${url}\n   Type: ${p.type || "page"}\n   Created: ${p.createdAt}`;
             })
             .join("\n\n");
 
