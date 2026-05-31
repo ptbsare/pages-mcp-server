@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { nanoid } from "nanoid";
 import AdmZip from "adm-zip";
 export class FileStorage {
     basePath;
@@ -245,6 +246,160 @@ export class FileStorage {
                 fs.copyFileSync(srcPath, destPath);
             }
         }
+    }
+    // ─── File Sharing ──────────────────────────────────────
+    /**
+     * Deploy a single file for sharing. Returns the share ID.
+     */
+    deployFile(filePath, name) {
+        if (!fs.existsSync(filePath)) {
+            throw new Error(`File not found: ${filePath}`);
+        }
+        const stat = fs.statSync(filePath);
+        if (!stat.isFile()) {
+            throw new Error(`Path is not a file: ${filePath}`);
+        }
+        // Check size limit (4MB for single file)
+        const MAX_SIZE = 4 * 1024 * 1024;
+        if (stat.size > MAX_SIZE) {
+            throw new Error(`File too large (${stat.size} bytes). Max: ${MAX_SIZE} bytes`);
+        }
+        const shareId = nanoid(12);
+        const dir = this.getPageDir(shareId);
+        fs.mkdirSync(dir, { recursive: true });
+        const fileName = path.basename(filePath);
+        fs.copyFileSync(filePath, path.join(dir, fileName));
+        // Store metadata
+        fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
+            type: "file",
+            fileName,
+            fileSize: stat.size,
+            createdAt: new Date().toISOString(),
+            locked: false,
+        }));
+        return { shareId, fileName, fileSize: stat.size };
+    }
+    /**
+     * Deploy a folder as a zip for sharing. Returns the share ID.
+     */
+    deployFolderAsZip(folderPath, name) {
+        if (!fs.existsSync(folderPath)) {
+            throw new Error(`Folder not found: ${folderPath}`);
+        }
+        const stat = fs.statSync(folderPath);
+        if (!stat.isDirectory()) {
+            throw new Error(`Path is not a directory: ${folderPath}`);
+        }
+        // Create zip
+        const AdmZip = require("adm-zip");
+        const zip = new AdmZip();
+        this.addToZip(zip, folderPath, "");
+        const zipBuffer = zip.toBuffer();
+        // Check size limit (1GB for zip)
+        const MAX_SIZE = 1024 * 1024 * 1024;
+        if (zipBuffer.length > MAX_SIZE) {
+            throw new Error(`Zip too large (${zipBuffer.length} bytes). Max: ${MAX_SIZE} bytes`);
+        }
+        const shareId = nanoid(12);
+        const dir = this.getPageDir(shareId);
+        fs.mkdirSync(dir, { recursive: true });
+        const zipName = (name || path.basename(folderPath)) + ".zip";
+        fs.writeFileSync(path.join(dir, zipName), zipBuffer);
+        // Count files
+        const fileCount = this.listFiles(folderPath).length;
+        // Store metadata
+        fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
+            type: "folder",
+            folderName: path.basename(folderPath),
+            fileCount,
+            zipName,
+            zipSize: zipBuffer.length,
+            createdAt: new Date().toISOString(),
+            locked: false,
+        }));
+        return { shareId, fileCount, zipSize: zipBuffer.length };
+    }
+    addToZip(zip, dirPath, zipPath) {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+            const srcPath = path.join(dirPath, entry.name);
+            const entryZipPath = zipPath + entry.name;
+            const lstat = fs.lstatSync(srcPath);
+            if (lstat.isSymbolicLink())
+                continue; // Skip symlinks
+            if (entry.isDirectory()) {
+                this.addToZip(zip, srcPath, entryZipPath + "/");
+            }
+            else {
+                zip.addLocalFile(srcPath, zipPath);
+            }
+        }
+    }
+    /**
+     * Get share metadata.
+     */
+    getShareMeta(shareId) {
+        const metaPath = path.join(this.getPageDir(shareId), ".meta");
+        if (!fs.existsSync(metaPath))
+            return null;
+        try {
+            return JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+        }
+        catch {
+            return null;
+        }
+    }
+    /**
+     * Lock or unlock a share (prevents auto-cleanup).
+     */
+    setShareLock(shareId, locked) {
+        const meta = this.getShareMeta(shareId);
+        if (!meta)
+            return false;
+        meta.locked = locked;
+        const metaPath = path.join(this.getPageDir(shareId), ".meta");
+        fs.writeFileSync(metaPath, JSON.stringify(meta));
+        return true;
+    }
+    /**
+     * List all shares with metadata.
+     */
+    listShares() {
+        const results = [];
+        if (!fs.existsSync(this.basePath))
+            return results;
+        const entries = fs.readdirSync(this.basePath, { withFileTypes: true });
+        for (const entry of entries) {
+            if (!entry.isDirectory())
+                continue;
+            const meta = this.getShareMeta(entry.name);
+            if (meta) {
+                results.push({ shareId: entry.name, meta });
+            }
+        }
+        return results;
+    }
+    /**
+     * Delete expired shares (not locked, older than expireDays).
+     * Returns number of deleted shares.
+     */
+    cleanupExpired(expireDays) {
+        if (expireDays <= 0)
+            return 0; // 0 = no expiration
+        const now = Date.now();
+        const maxAge = expireDays * 24 * 60 * 60 * 1000;
+        let deleted = 0;
+        const shares = this.listShares();
+        for (const { shareId, meta } of shares) {
+            if (meta.locked)
+                continue;
+            const created = new Date(meta.createdAt).getTime();
+            if (now - created > maxAge) {
+                this.deletePage(shareId);
+                deleted++;
+            }
+        }
+        return deleted;
     }
 }
 //# sourceMappingURL=storage.js.map

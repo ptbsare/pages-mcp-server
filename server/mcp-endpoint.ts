@@ -117,6 +117,25 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
                   required: ["id"],
                 },
               },
+              {
+                name: "deploy_file",
+                description:
+                  "Share a file or folder. For a single file, returns a direct download link. For a folder, packs all files into a zip and returns a shareable URL with preview. Supports image preview, text preview, and download.",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    path: {
+                      type: "string",
+                      description: "Absolute path to the file or folder to share.",
+                    },
+                    name: {
+                      type: "string",
+                      description: "Optional display name for the share.",
+                    },
+                  },
+                  required: ["path"],
+                },
+              },
             ],
           },
         });
@@ -261,6 +280,39 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
               ],
             },
           });
+          return;
+        }
+
+        if (name === "deploy_file") {
+          const { path: filePath, name: shareName } = args as any;
+          if (!filePath) {
+            res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "Error: Missing required argument: path" }], isError: true } });
+            return;
+          }
+          try {
+            const fs = await import("fs");
+            const path = await import("path");
+            if (!fs.existsSync(filePath)) {
+              res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `Error: Path not found: ${filePath}` }], isError: true } });
+              return;
+            }
+            const stat = fs.statSync(filePath);
+            if (stat.isFile()) {
+              // Single file share
+              const result = storage.deployFile(filePath, shareName);
+              const url = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}`;
+              res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `✅ File shared successfully!\n\nURL: ${url}\nFile: ${result.fileName}\nSize: ${result.fileSize} bytes` }] } });
+            } else if (stat.isDirectory()) {
+              // Folder share (zip)
+              const result = storage.deployFolderAsZip(filePath, shareName);
+              const url = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}`;
+              res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `✅ Folder shared successfully!\n\nURL: ${url}\nFiles: ${result.fileCount}\nZip size: ${result.zipSize} bytes` }] } });
+            } else {
+              res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "Error: Path is neither a file nor a directory" }], isError: true } });
+            }
+          } catch (err: any) {
+            res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true } });
+          }
           return;
         }
 

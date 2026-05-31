@@ -236,6 +236,64 @@ export function createApp(config: ServerConfig) {
     res.sendFile(fullPath);
   });
 
+  // ─── File Sharing: /f/:shareId ──────────────────────────
+  const shareHtmlPath = path.resolve(process.cwd(), "server", "public", "share.html");
+  let shareHtmlTemplate = "";
+  try { shareHtmlTemplate = fs.readFileSync(shareHtmlPath, "utf-8"); } catch { console.error("share.html not found"); }
+
+  app.get("/f/:shareId", async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
+    const meta = storage.getShareMeta(shareId);
+    if (!meta) { res.status(404).send("Not found"); return; }
+    const pageDir = path.join(config.storagePath, shareId);
+    const publicUrl = buildUrl(config.domain, config.outPort);
+    let content = "";
+    if (meta.type === "file") {
+      // Single file: show preview + download
+      const filePath = path.join(pageDir, meta.fileName);
+      const ext = path.extname(meta.fileName).toLowerCase();
+      const isImage = [".jpg",".jpeg",".png",".gif",".webp",".svg",".bmp",".ico"].includes(ext);
+      const isText = [".txt",".md",".json",".js",".ts",".css",".html",".xml",".yaml",".yml",".log",".csv",".sh",".py",".java",".c",".cpp",".h",".go",".rs"].includes(ext);
+      if (isImage) {
+        content = `<div class="preview"><img src="/f/${shareId}/raw" alt="${meta.fileName}"></div>`;
+      } else if (isText) {
+        try {
+          const textContent = fs.readFileSync(filePath, "utf-8");
+          const escaped = textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+          content = `<div class="preview"><pre>${escaped}</pre></div>`;
+        } catch { content = `<div class="preview"><div class="placeholder"><div class="icon">📄</div><p>Cannot preview this file</p></div></div>`; }
+      } else {
+        content = `<div class="preview"><div class="placeholder"><div class="icon">📦</div><p>${meta.fileName}</p><p style="font-size:12px;color:#64748b;margin-top:8px;">${meta.fileSize} bytes</p></div></div>`;
+      }
+      content += `<div class="download-all"><a href="/f/${shareId}/raw" download="${meta.fileName}" class="btn btn-primary">⬇️ Download ${meta.fileName}</a></div>`;
+    } else if (meta.type === "folder") {
+      // Folder: show file list from zip
+      content = `<div class="card"><div class="card-header"><h2>📁 ${meta.folderName} (${meta.fileCount} files)</h2></div><div class="download-all"><a href="/f/${shareId}/raw" download="${meta.zipName}" class="btn btn-primary">⬇️ Download All as Zip (${meta.zipSize} bytes)</a></div></div>`;
+    }
+    const html = shareHtmlTemplate
+      .replace(/__TITLE__/g, meta.fileName || meta.folderName || "File Share")
+      .replace(/__META__/g, `${meta.type === "file" ? "Single file" : `${meta.fileCount} files`} · ${meta.fileSize || meta.zipSize || 0} bytes · ${meta.createdAt}`)
+      .replace(/__CONTENT__/g, content);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+  });
+
+  // File download/raw endpoint
+  app.get("/f/:shareId/raw", async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
+    const meta = storage.getShareMeta(shareId);
+    if (!meta) { res.status(404).send("Not found"); return; }
+    const pageDir = path.join(config.storagePath, shareId);
+    const fileName = meta.fileName || meta.zipName;
+    const filePath = path.join(pageDir, fileName);
+    if (!fs.existsSync(filePath)) { res.status(404).send("File not found"); return; }
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.sendFile(filePath);
+  });
+
   // ─── 2. Deploy API (Bearer token) ────────────────────────
   const deployAuth = bearerAuth(db);
 
@@ -374,6 +432,53 @@ export function createApp(config: ServerConfig) {
     } catch (err: any) {
       console.error('OTP decrypt error:', err);
       res.status(500).json({ error: "Decryption failed" });
+    }
+  });
+
+  // ─── File Sharing Management ───────────────────────────
+
+  // List all file shares
+  app.get("/api/admin/shares", adminAuth, csrfProtection, adminLimiter, async (req: Request, res: Response) => {
+    try {
+      const shares = storage.listShares();
+      res.json({ shares, total: shares.length });
+    } catch (err: any) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Lock/unlock a share
+  app.post("/api/admin/shares/:shareId/lock", adminAuth, csrfProtection, adminLimiter, async (req: Request, res: Response) => {
+    try {
+      const { locked } = req.body;
+      const ok = storage.setShareLock(req.params.shareId, !!locked);
+      if (!ok) { res.status(404).json({ error: "Share not found" }); return; }
+      res.json({ success: true, locked: !!locked });
+    } catch (err: any) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Delete a share
+  app.delete("/api/admin/shares/:shareId", adminAuth, csrfProtection, adminLimiter, async (req: Request, res: Response) => {
+    try {
+      const meta = storage.getShareMeta(req.params.shareId);
+      if (!meta) { res.status(404).json({ error: "Share not found" }); return; }
+      storage.deletePage(req.params.shareId);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Cleanup expired shares
+  app.post("/api/admin/shares/cleanup", adminAuth, csrfProtection, adminLimiter, async (req: Request, res: Response) => {
+    try {
+      const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
+      const deleted = storage.cleanupExpired(expireDays);
+      res.json({ success: true, deleted, expireDays });
+    } catch (err: any) {
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 

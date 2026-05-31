@@ -47,5 +47,42 @@ export declare class FileStorage {
      * Rejects symbolic links to prevent SSRF via symlink following.
      */
     private copyDir;
+    /**
+     * Deploy a single file for sharing. Returns the share ID.
+     */
+    deployFile(filePath: string, name?: string): {
+        shareId: string;
+        fileName: string;
+        fileSize: number;
+    };
+    /**
+     * Deploy a folder as a zip for sharing. Returns the share ID.
+     */
+    deployFolderAsZip(folderPath: string, name?: string): {
+        shareId: string;
+        fileCount: number;
+        zipSize: number;
+    };
+    private addToZip;
+    /**
+     * Get share metadata.
+     */
+    getShareMeta(shareId: string): any;
+    /**
+     * Lock or unlock a share (prevents auto-cleanup).
+     */
+    setShareLock(shareId: string, locked: boolean): boolean;
+    /**
+     * List all shares with metadata.
+     */
+    listShares(): Array<{
+        shareId: string;
+        meta: any;
+    }>;
+    /**
+     * Delete expired shares (not locked, older than expireDays).
+     * Returns number of deleted shares.
+     */
+    cleanupExpired(expireDays: number): number;
 }
 //# sourceMappingURL=storage.d.ts.map
