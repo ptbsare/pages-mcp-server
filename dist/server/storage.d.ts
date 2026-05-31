@@ -88,11 +88,12 @@ export declare class FileStorage {
     /**
      * Get share metadata.
      */
-    getShareMeta(shareId: string): any;
+    /** Get share metadata from database (no .meta file needed) */
+    getShareMeta(shareId: string, db: any): any;
     /**
      * List all shares with metadata.
      */
-    listShares(): Array<{
+    listShares(db: any): Array<{
         shareId: string;
         meta: any;
     }>;

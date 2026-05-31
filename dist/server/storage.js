@@ -409,21 +409,27 @@ export class FileStorage {
     /**
      * Get share metadata.
      */
-    getShareMeta(shareId) {
-        const metaPath = path.join(this.getPageDir(shareId), ".meta");
-        if (!fs.existsSync(metaPath))
+    /** Get share metadata from database (no .meta file needed) */
+    getShareMeta(shareId, db) {
+        const page = db.getPageByShareId(shareId);
+        if (!page)
             return null;
-        try {
-            return JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-        }
-        catch {
-            return null;
-        }
+        const pageDir = this.getPageDir(shareId);
+        const files = this.listFiles(pageDir);
+        return {
+            type: page.type || (files.length > 1 ? "folder" : "file"),
+            folderName: page.name,
+            fileName: page.type === "file" ? page.name : undefined,
+            fileCount: page.fileCount || files.length,
+            totalSize: page.totalSize || 0,
+            createdAt: page.createdAt,
+            locked: page.locked || false,
+        };
     }
     /**
      * List all shares with metadata.
      */
-    listShares() {
+    listShares(db) {
         const results = [];
         if (!fs.existsSync(this.basePath))
             return results;
@@ -431,7 +437,7 @@ export class FileStorage {
         for (const entry of entries) {
             if (!entry.isDirectory())
                 continue;
-            const meta = this.getShareMeta(entry.name);
+            const meta = this.getShareMeta(entry.name, db);
             if (meta) {
                 results.push({ shareId: entry.name, meta });
             }

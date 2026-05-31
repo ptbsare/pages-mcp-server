@@ -4,6 +4,23 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>__TITLE__</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/javascript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/xml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/css.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/markdown.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/java.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/c.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/cpp.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/rust.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/shell.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/sql.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
@@ -14,19 +31,19 @@
     .card { background: #1e293b; border-radius: 12px; border: 1px solid #334155; overflow: hidden; margin-bottom: 16px; }
     .card-header { padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
     .card-header h2 { font-size: 13px; font-weight: 600; color: #94a3b8; }
-    .breadcrumb { padding: 10px 16px; font-size: 12px; color: #64748b; border-bottom: 1px solid #334155; background: #1e293b; }
+    .breadcrumb { padding: 10px 16px; font-size: 12px; color: #64748b; border-bottom: 1px solid #334155; background: #1e293b; overflow-x: auto; white-space: nowrap; }
     .breadcrumb a { color: #818cf8; text-decoration: none; }
     .breadcrumb a:hover { text-decoration: underline; }
     .breadcrumb span { margin: 0 4px; color: #475569; }
     .file-list { list-style: none; }
-    .file-list li { padding: 10px 16px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 10px; }
+    .file-list li { padding: 10px 16px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 10px; cursor: pointer; }
     .file-list li:last-child { border-bottom: none; }
     .file-list li:hover { background: #334155; }
-    .icon { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; background: #334155; }
+    .file-list li.dir-item { cursor: pointer; }
+    .thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #334155; flex-shrink: 0; }
+    .icon { width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; background: #334155; }
     .icon.dir { background: #1e3a5f; }
     .icon.img { background: #065f46; }
-    .icon.txt { background: #1e3a5f; }
-    .icon.zip { background: #7c2d12; }
     .file-info { flex: 1; min-width: 0; }
     .file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .file-name a { color: #e2e8f0; text-decoration: none; }
@@ -39,15 +56,21 @@
     .btn-secondary { background: #334155; color: #e2e8f0; }
     .btn-secondary:hover { background: #475569; }
     .btn-sm { padding: 4px 10px; font-size: 11px; }
-    .preview { padding: 16px; text-align: center; }
-    .preview img { max-width: 100%; max-height: 60vh; border-radius: 8px; }
-    .preview pre { text-align: left; background: #0f172a; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 12px; line-height: 1.6; max-height: 60vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
-    .upload-area { padding: 16px; border: 2px dashed #475569; border-radius: 8px; text-align: center; margin: 16px; transition: border-color 0.2s; }
-    .upload-area:hover, .upload-area.dragover { border-color: #818cf8; }
-    .upload-area input[type="file"] { display: none; }
-    .upload-area label { cursor: pointer; color: #94a3b8; font-size: 13px; }
-    .upload-area label:hover { color: #e2e8f0; }
-    .upload-status { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+    .preview-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 100; overflow-y: auto; }
+    .preview-overlay.active { display: block; }
+    .preview-header { position: sticky; top: 0; background: #1e293b; padding: 12px 20px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+    .preview-header h3 { font-size: 14px; font-weight: 500; word-break: break-all; flex: 1; min-width: 0; padding-right: 12px; }
+    .preview-content { padding: 20px; max-width: 1000px; margin: 0 auto; }
+    .preview-content pre { background: #0f172a; padding: 20px; border-radius: 8px; overflow-x: auto; font-size: 12px; line-height: 1.6; max-height: 70vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+    .preview-content pre code { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 12px; }
+    .preview-content img { max-width: 100%; max-height: 70vh; border-radius: 8px; display: block; margin: 0 auto; }
+    .preview-content .pdf-viewer { width: 100%; height: 80vh; border: none; border-radius: 8px; }
+    .preview-content .office-viewer { width: 100%; height: 80vh; border: none; border-radius: 8px; background: white; }
+    .preview-error { text-align: center; padding: 40px; color: #94a3b8; }
+    .preview-error .icon { font-size: 48px; margin-bottom: 12px; }
+    .loading { text-align: center; padding: 40px; color: #94a3b8; }
+    .loading::after { content: ''; display: inline-block; width: 20px; height: 20px; border: 2px solid #334155; border-top-color: #818cf8; border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .toast { position: fixed; bottom: 16px; left: 16px; right: 16px; padding: 10px 16px; border-radius: 8px; color: white; font-size: 13px; z-index: 200; text-align: center; transition: opacity 0.3s; }
     .toast-success { background: #059669; }
     .toast-error { background: #dc2626; }
@@ -68,10 +91,40 @@
     __CONTENT__
   </div>
   <div id="toast" class="toast" style="display:none;"></div>
+
+  <!-- Preview Overlay -->
+  <div id="previewOverlay" class="preview-overlay" onclick="closePreview(event)">
+    <div class="preview-header">
+      <h3 id="previewTitle"></h3>
+      <div style="display:flex;gap:8px;flex-shrink:0;">
+        <a id="previewDownload" href="#" download class="btn btn-primary btn-sm">⬇️ Download</a>
+        <button class="btn btn-secondary btn-sm" onclick="closePreview()">✕ Close</button>
+      </div>
+    </div>
+    <div id="previewContent" class="preview-content"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
   <script>
     const SHARE_ID = '__SHARE_ID__';
     const BASE_URL = '/f/' + SHARE_ID;
     let currentPath = '';
+
+    // File type detection
+    const TEXT_EXTS = ['txt','md','json','js','ts','jsx','tsx','css','scss','less','html','htm','xml','yaml','yml','toml','ini','cfg','conf','env','gitignore','dockerignore','sh','bash','zsh','fish','py','rb','php','java','c','cpp','h','hpp','go','rs','swift','kt','scala','clj','ex','exs','erl','hrl','hs','lua','pl','pm','r','m','mm','sql','graphql','proto','cmake','makefile','dockerfile','nginx','apache','log','csv','tsv','diff','patch','vim','emacs','sublime','atom','vscode'];
+    const CODE_EXTS = ['js','ts','jsx','tsx','css','scss','less','html','htm','xml','json','yaml','yml','py','rb','php','java','c','cpp','h','hpp','go','rs','swift','kt','scala','clj','ex','erl','hs','lua','pl','r','m','sql','sh','bash','zsh','fish','ps1','bat','cmd','dockerfile','nginx','apache','cmake','makefile','diff','patch','vim','emacs','graphql','proto','toml','ini','cfg','env'];
+    const IMAGE_EXTS = ['jpg','jpeg','png','gif','webp','svg','bmp','ico','tiff','tif','heic','heif','avif','raw','cr2','nef','arw'];
+    const PDF_EXTS = ['pdf'];
+    const OFFICE_EXTS = ['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','rtf'];
+
+    function isTextFile(name) { return TEXT_EXTS.includes(getExt(name)); }
+    function isCodeFile(name) { return CODE_EXTS.includes(getExt(name)); }
+    function isImageFile(name) { return IMAGE_EXTS.includes(getExt(name)); }
+    function isPdfFile(name) { return PDF_EXTS.includes(getExt(name)); }
+    function isOfficeFile(name) { return OFFICE_EXTS.includes(getExt(name)); }
+    function isPreviewable(name) { return isTextFile(name) || isImageFile(name) || isPdfFile(name) || isOfficeFile(name); }
+    function getExt(name) { return (name.split('.').pop() || '').toLowerCase(); }
 
     function showToast(msg, type) {
       const t = document.getElementById('toast');
@@ -82,19 +135,15 @@
     }
 
     function formatSize(bytes) {
+      if (!bytes) return '0 B';
       if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-      return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+      return (bytes / 1073741824).toFixed(2) + ' GB';
     }
 
-    function getFileIcon(name) {
-      const ext = name.split('.').pop().toLowerCase();
-      if (['jpg','jpeg','png','gif','webp','svg','bmp','ico'].includes(ext)) return { cls: 'img', emoji: '🖼️' };
-      if (['txt','md','json','js','ts','css','html','xml','yaml','yml','log','csv','sh','py','java','c','cpp','h','go','rs'].includes(ext)) return { cls: 'txt', emoji: '📄' };
-      if (['zip','tar','gz','rar','7z'].includes(ext)) return { cls: 'zip', emoji: '📦' };
-      return { cls: '', emoji: '📎' };
-    }
+    function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function escJs(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r'); }
 
     async function loadDir(dirPath) {
       currentPath = dirPath;
@@ -112,13 +161,13 @@
 
       // Breadcrumb
       html += '<div class="card"><div class="breadcrumb">';
-      html += `<a href="#" onclick="loadDir('');return false;">📁 ${data.folderName || 'Root'}</a>`;
+      html += `<a href="#" onclick="loadDir('');return false;">📁 ${escHtml(data.folderName || 'Root')}</a>`;
       if (data.currentPath) {
         const parts = data.currentPath.split('/');
         let accum = '';
         for (const p of parts) {
           accum += (accum ? '/' : '') + p;
-          html += `<span>/</span><a href="#" onclick="loadDir('${accum}');return false;">${p}</a>`;
+          html += `<span>/</span><a href="#" onclick="loadDir('${escJs(accum)}');return false;">${escHtml(p)}</a>`;
         }
       }
       html += '</div></div>';
@@ -137,33 +186,118 @@
         html += '<ul class="file-list">';
         // Directories first
         for (const entry of data.entries.filter(e => e.isDirectory)) {
-          html += `<li><div class="icon dir">📁</div><div class="file-info">`;
-          const dirName = escHtml(entry.name); const dirJs = escJs(entry.name);
-          html += `<div class="file-name"><a href="#" onclick="loadDir('${(currentPath ? currentPath + '/' : '') + dirJs}');return false;">${dirName}</a></div>`;
+          const name = escHtml(entry.name); const js = escJs(entry.name);
+          const subPath = (currentPath ? currentPath + '/' : '') + js;
+          html += `<li class="dir-item" onclick="loadDir('${subPath}')">`;
+          html += `<div class="icon dir">📁</div>`;
+          html += `<div class="file-info"><div class="file-name">${name}</div>`;
           html += `<div class="file-size">${entry.fileCount} files · ${formatSize(entry.size)}</div></div>`;
-          html += `<div class="file-actions"><button class="btn btn-secondary btn-sm" onclick="downloadEntry('${dirJs}',true)">⬇️ Zip</button></div></li>`;
+          html += `<div class="file-actions"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();downloadEntry('${js}',true)">⬇️ Zip</button></div></li>`;
         }
         // Files
         for (const entry of data.entries.filter(e => !e.isDirectory)) {
-          const fileName = escHtml(entry.name); const fileJs = escJs(entry.name);
-          const icon = getFileIcon(entry.name);
+          const name = escHtml(entry.name); const js = escJs(entry.name);
           const dlUrl = BASE_URL + '/raw' + (currentPath ? '/' + currentPath : '') + '/' + encodeURIComponent(entry.name);
-          html += `<li><div class="icon ${icon.cls}">${icon.emoji}</div><div class="file-info">`;
-          html += `<div class="file-name"><a href="${dlUrl}" target="_blank" rel="noopener">${fileName}</a></div>`;
+          const previewable = isPreviewable(entry.name);
+          const isImg = isImageFile(entry.name);
+
+          html += '<li>';
+          if (isImg) {
+            // Show thumbnail for images
+            const thumbUrl = BASE_URL + '/raw' + (currentPath ? '/' + currentPath : '') + '/' + encodeURIComponent(entry.name) + '?thumb=1';
+            html += `<img class="thumb" src="${thumbUrl}" alt="${name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">`;
+            html += `<div class="icon img" style="display:none;">🖼️</div>`;
+          } else {
+            const icon = isTextFile(entry.name) ? '📄' : isPdfFile(entry.name) ? '📕' : isOfficeFile(entry.name) ? '📊' : '📎';
+            html += `<div class="icon">${icon}</div>`;
+          }
+          html += `<div class="file-info">`;
+          if (previewable) {
+            html += `<div class="file-name"><a href="#" onclick="previewFile('${js}','${getExt(entry.name)}');return false;">${name}</a></div>`;
+          } else {
+            html += `<div class="file-name"><a href="${dlUrl}" target="_blank" rel="noopener">${name}</a></div>`;
+          }
           html += `<div class="file-size">${formatSize(entry.size)}</div></div>`;
-          html += `<div class="file-actions"><a href="${dlUrl}" download="${fileJs}" class="btn btn-primary btn-sm">⬇️</a></div></li>`;
+          html += `<div class="file-actions">`;
+          if (previewable) {
+            html += `<button class="btn btn-secondary btn-sm" onclick="previewFile('${js}','${getExt(entry.name)}')">👁️ Preview</button>`;
+          }
+          html += `<a href="${dlUrl}" download="${js}" class="btn btn-primary btn-sm">⬇️</a></div></li>`;
         }
         html += '</ul>';
       }
       html += '</div>';
-
       container.innerHTML = html;
     }
 
-    // Escape HTML entities
-    function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-    // Escape for JS string literal
-    function escJs(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r'); }
+    // Preview file
+    async function previewFile(fileName, ext) {
+      const overlay = document.getElementById('previewOverlay');
+      const title = document.getElementById('previewTitle');
+      const content = document.getElementById('previewContent');
+      const downloadBtn = document.getElementById('previewDownload');
+      const filePath = (currentPath ? currentPath + '/' : '') + fileName;
+      const fileUrl = BASE_URL + '/raw' + '/' + encodeURIComponent(filePath);
+
+      title.textContent = fileName;
+      downloadBtn.href = fileUrl;
+      downloadBtn.download = fileName;
+      overlay.classList.add('active');
+      content.innerHTML = '<div class="loading">Loading...</div>';
+
+      try {
+        if (isImageFile(fileName)) {
+          // Image preview with HEIC support
+          if (['heic','heif'].includes(ext)) {
+            const resp = await fetch(fileUrl);
+            const blob = await resp.blob();
+            try {
+              const converted = await heic2any({ blob: blob, toType: 'image/jpeg', quality: 0.8 });
+              const url = URL.createObjectURL(converted);
+              content.innerHTML = `<img src="${url}" alt="${escHtml(fileName)}">`;
+            } catch {
+              content.innerHTML = `<div class="preview-error"><div class="icon">🖼️</div><p>HEIC conversion failed</p><a href="${fileUrl}" download class="btn btn-primary btn-sm">Download</a></div>`;
+            }
+          } else {
+            const resp = await fetch(fileUrl);
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            content.innerHTML = `<img src="${url}" alt="${escHtml(fileName)}">`;
+          }
+        } else if (isPdfFile(fileName)) {
+          // PDF preview using browser built-in viewer
+          content.innerHTML = `<iframe class="pdf-viewer" src="${fileUrl}#toolbar=1&navpanes=0"></iframe>`;
+        } else if (isOfficeFile(fileName)) {
+          // Office preview using Microsoft Office Online
+          const encodedUrl = encodeURIComponent(fileUrl);
+          content.innerHTML = `<iframe class="office-viewer" src="https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}"></iframe>`;
+        } else if (isTextFile(fileName)) {
+          // Text/code preview
+          const resp = await fetch(fileUrl);
+          const text = await resp.text();
+          const lang = isCodeFile(fileName) ? ext : 'plaintext';
+          let highlighted;
+          try {
+            if (hljs.getLanguage(lang)) {
+              highlighted = hljs.highlight(text, { language: lang }).value;
+            } else {
+              highlighted = escHtml(text);
+            }
+          } catch { highlighted = escHtml(text); }
+          content.innerHTML = `<pre><code class="hljs language-${lang}">${highlighted}</code></pre>`;
+        } else {
+          content.innerHTML = `<div class="preview-error"><div class="icon">📎</div><p>Cannot preview this file type</p><a href="${fileUrl}" download class="btn btn-primary btn-sm">Download</a></div>`;
+        }
+      } catch (e) {
+        content.innerHTML = `<div class="preview-error"><div class="icon">❌</div><p>Failed to load: ${escHtml(e.message)}</p><a href="${fileUrl}" download class="btn btn-primary btn-sm">Download</a></div>`;
+      }
+    }
+
+    function closePreview(e) {
+      if (!e || e.target.id === 'previewOverlay' || e.target.closest('.preview-header')) {
+        document.getElementById('previewOverlay').classList.remove('active');
+      }
+    }
 
     function downloadEntry(name, isDir) {
       const url = BASE_URL + '/raw' + (currentPath ? '/' + currentPath : '') + '/' + name + (isDir ? '?zip=1' : '');
@@ -173,6 +307,9 @@
     function downloadZip() {
       window.location.href = BASE_URL + '/raw?zip=1';
     }
+
+    // Close preview on Escape key
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePreview(); });
 
     // Initial load
     loadDir('');
