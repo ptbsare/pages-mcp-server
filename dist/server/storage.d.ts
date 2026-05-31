@@ -80,7 +80,7 @@ export declare class FileStorage {
      */
     /** Calculate total size of a directory */
     private calculateDirSize;
-    /** Lock or unlock a share (prevents auto-cleanup when locked) */
+    /** Lock or unlock a page (prevents auto-cleanup when locked). Uses database. */
     setShareLock(shareId: string, locked: boolean): boolean;
     private addToZip;
     /**
@@ -99,7 +99,7 @@ export declare class FileStorage {
      * Called on each deploy operation (not on a timer).
      * Returns { sharesDeleted, pagesDeleted }.
      */
-    cleanupExpired(expireDays: number): {
+    cleanupExpired(expireDays: number, db: any): {
         sharesDeleted: number;
         pagesDeleted: number;
     };

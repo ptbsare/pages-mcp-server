@@ -34,9 +34,12 @@ export class PagesDatabase {
         share_id TEXT UNIQUE NOT NULL,
         name TEXT NOT NULL DEFAULT '',
         description TEXT DEFAULT '',
+        type TEXT NOT NULL DEFAULT 'page',
         file_count INTEGER NOT NULL DEFAULT 0,
+        total_size INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        locked INTEGER NOT NULL DEFAULT 0
       )
     `);
         this.db.exec(`
@@ -64,9 +67,9 @@ export class PagesDatabase {
     }
     async createPage(page) {
         const db = await this.ensureDb();
-        const stmt = db.prepare(`INSERT INTO pages (id, share_id, name, description, file_count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`);
-        stmt.run([page.id, page.shareId, page.name, page.description ?? "", page.fileCount, page.createdAt, page.updatedAt]);
+        const stmt = db.prepare(`INSERT INTO pages (id, share_id, name, description, type, file_count, total_size, created_at, updated_at, locked)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        stmt.run([page.id, page.shareId, page.name, page.description ?? "", page.type || "page", page.fileCount, page.totalSize || 0, page.createdAt, page.updatedAt, page.locked ? 1 : 0]);
         stmt.free();
         this.save();
     }
@@ -121,6 +124,10 @@ export class PagesDatabase {
             sets.push("description = ?");
             vals.push(updates.description);
         }
+        if (updates.locked !== undefined) {
+            sets.push("locked = ?");
+            vals.push(updates.locked ? 1 : 0);
+        }
         if (sets.length === 0)
             return false;
         sets.push("updated_at = ?");
@@ -150,9 +157,12 @@ export class PagesDatabase {
             shareId: row.share_id,
             name: row.name,
             description: row.description,
+            type: row.type || "page",
             fileCount: row.file_count,
+            totalSize: row.total_size || 0,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
+            locked: row.locked === 1,
         };
     }
     // ─── Auth Token CRUD ─────────────────────────────────

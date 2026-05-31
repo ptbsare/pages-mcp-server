@@ -1,14 +1,14 @@
 import { buildUrl } from "../shared/types.js";
 import { nanoid } from "nanoid";
 /** Trigger cleanup of expired shares/pages (non-blocking) */
-function triggerCleanup(storage) {
+function triggerCleanup(storage, db) {
     const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
     if (expireDays <= 0)
         return;
     // Fire and forget — don't block the response
     setImmediate(() => {
         try {
-            const result = storage.cleanupExpired(expireDays);
+            const result = storage.cleanupExpired(expireDays, db);
             const total = result.sharesDeleted + result.pagesDeleted;
             if (total > 0)
                 console.log(`🧹 Cleaned up ${total} expired items (${result.sharesDeleted} shares, ${result.pagesDeleted} pages)`);
@@ -151,7 +151,7 @@ export function createMcpHandler(config, db, storage) {
                             ],
                         },
                     });
-                    triggerCleanup(storage);
+                    triggerCleanup(storage, db);
                     return;
                 }
                 if (name === "list_pages") {
@@ -170,7 +170,8 @@ export function createMcpHandler(config, db, storage) {
                     const text = result.pages
                         .map((p) => {
                         const url = `${buildUrl(config.domain, config.outPort)}/s/${p.shareId}`;
-                        return `📄 ${p.name}\n   ID: ${p.id}\n   URL: ${url}\n   Files: ${p.fileCount}\n   Created: ${p.createdAt}`;
+                        const lockInfo = p.locked ? " [🔒 Locked]" : "";
+                        return `📄 ${p.name}${lockInfo}\n   ID: ${p.id}\n   URL: ${url}\n   Files: ${p.fileCount}\n   Created: ${p.createdAt}`;
                     })
                         .join("\n\n");
                     res.json({

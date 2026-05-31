@@ -3,11 +3,14 @@ export interface DeployedPage {
     id: string;
     name: string;
     description?: string;
+    type?: string;
     createdAt: string;
     updatedAt: string;
     fileCount: number;
+    totalSize?: number;
     /** The URL-safe share path, e.g. "hdhdjsjhsguh" */
     shareId: string;
+    locked?: boolean;
 }
 /** Request to deploy HTML content (single file) */
 export interface DeployHtmlRequest {

@@ -457,7 +457,7 @@ export function createApp(config) {
             }
             const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
             if (expireDays > 0)
-                setImmediate(() => storage.cleanupExpired(expireDays));
+                setImmediate(() => storage.cleanupExpired(expireDays, db));
         }
         catch (err) {
             console.error("Upload error:", err);
@@ -686,7 +686,7 @@ export function createApp(config) {
             // Trigger async cleanup of expired items
             const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
             if (expireDays > 0)
-                setImmediate(() => storage.cleanupExpired(expireDays));
+                setImmediate(() => storage.cleanupExpired(expireDays, db));
         }
         catch (err) {
             res.status(500).json({ error: "Deploy failed" });
@@ -708,7 +708,7 @@ export function createApp(config) {
             res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, createdAt: now });
             const expireDays2 = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
             if (expireDays2 > 0)
-                setImmediate(() => storage.cleanupExpired(expireDays2));
+                setImmediate(() => storage.cleanupExpired(expireDays2, db));
         }
         catch (err) {
             console.error('Deploy error:', err);
@@ -826,7 +826,7 @@ export function createApp(config) {
     app.post("/api/admin/shares/cleanup", adminAuth, csrfProtection, adminLimiter, async (req, res) => {
         try {
             const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
-            const deleted = storage.cleanupExpired(expireDays);
+            const deleted = storage.cleanupExpired(expireDays, db);
             res.json({ success: true, deleted, expireDays });
         }
         catch (err) {
@@ -897,12 +897,8 @@ export function createApp(config) {
             const limit = parseInt(req.query.limit) || 50;
             const offset = parseInt(req.query.offset) || 0;
             const result = await db.listPages(limit, offset);
-            // Add locked status from storage metadata
-            const pagesWithLock = result.pages.map(p => {
-                const meta = storage.getShareMeta(p.shareId);
-                return { ...p, locked: meta?.locked || false };
-            });
-            res.json({ pages: pagesWithLock, total: result.total });
+            // locked field is already included from database via rowToPage
+            res.json({ pages: result.pages, total: result.total });
         }
         catch (err) {
             console.error('List pages error:', err);
@@ -918,7 +914,8 @@ export function createApp(config) {
                 res.status(404).json({ error: "Page not found" });
                 return;
             }
-            storage.setShareLock(page.shareId, !!locked);
+            // Update locked status in database directly
+            await db.updatePage(req.params.id, { locked: !!locked });
             res.json({ success: true, locked: !!locked });
         }
         catch (err) {

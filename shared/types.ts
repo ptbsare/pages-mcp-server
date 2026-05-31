@@ -7,11 +7,14 @@ export interface DeployedPage {
   id: string;           // nanoid
   name: string;         // human-readable name
   description?: string;
+  type?: string;        // "page" | "file" | "folder"
   createdAt: string;    // ISO date
   updatedAt: string;    // ISO date
   fileCount: number;
+  totalSize?: number;   // total bytes (for file shares)
   /** The URL-safe share path, e.g. "hdhdjsjhsguh" */
   shareId: string;
+  locked?: boolean;     // if true, skip auto-cleanup
 }
 
 /** Request to deploy HTML content (single file) */

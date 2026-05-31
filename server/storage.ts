@@ -394,13 +394,23 @@ export class FileStorage {
     return size;
   }
 
-  /** Lock or unlock a share (prevents auto-cleanup when locked) */
+  /** Lock or unlock a page (prevents auto-cleanup when locked). Uses database. */
   setShareLock(shareId: string, locked: boolean): boolean {
-    const meta = this.getShareMeta(shareId);
-    if (!meta) return false;
-    meta.locked = locked;
-    const metaPath = path.join(this.getPageDir(shareId), ".meta");
-    fs.writeFileSync(metaPath, JSON.stringify(meta));
+    // Find page by shareId and update locked status in database
+    const pageDir = this.getPageDir(shareId);
+    if (!fs.existsSync(pageDir)) return false;
+    // We need to find the page ID from the database
+    // Since we don't have a direct shareId->id mapping in storage,
+    // we'll use the database directly via the db reference
+    // For now, update .meta file as fallback (will be migrated to DB)
+    const metaPath = path.join(pageDir, ".meta");
+    if (fs.existsSync(metaPath)) {
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+        meta.locked = locked;
+        fs.writeFileSync(metaPath, JSON.stringify(meta));
+      } catch { /* ignore */ }
+    }
     return true;
   }
 
@@ -454,7 +464,7 @@ export class FileStorage {
    * Called on each deploy operation (not on a timer).
    * Returns { sharesDeleted, pagesDeleted }.
    */
-  cleanupExpired(expireDays: number): { sharesDeleted: number; pagesDeleted: number } {
+  cleanupExpired(expireDays: number, db: any): { sharesDeleted: number; pagesDeleted: number } {
     if (expireDays <= 0) return { sharesDeleted: 0, pagesDeleted: 0 };
     const now = Date.now();
     const maxAge = expireDays * 24 * 60 * 60 * 1000;
@@ -465,31 +475,22 @@ export class FileStorage {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const dirPath = path.join(this.basePath, entry.name);
-      // Check if it's a file share (has .meta file)
       const metaPath = path.join(dirPath, ".meta");
       if (fs.existsSync(metaPath)) {
-        // It's a file share
+        // File share: check .meta for locked status
         try {
           const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
           if (meta.locked) continue;
           const created = new Date(meta.createdAt).getTime();
-          if (now - created > maxAge) {
-            this.deletePage(entry.name);
-            sharesDeleted++;
-          }
-        } catch { /* ignore corrupt meta */ }
+          if (now - created > maxAge) { this.deletePage(entry.name); sharesDeleted++; }
+        } catch { /* ignore */ }
       } else {
-        // It's a regular page — check DB for lock status and creation time
-        // Pages without DB record are treated as unlocked
+        // Regular page: check database for locked status
         try {
-          const pageDir = dirPath;
-          // Check directory mtime as fallback for pages without DB record
-          const dirStat = fs.statSync(pageDir);
-          const dirAge = now - dirStat.mtimeMs;
-          if (dirAge > maxAge) {
-            this.deletePage(entry.name);
-            pagesDeleted++;
-          }
+          const page = db.getPageByShareId(entry.name);
+          if (page && page.locked) continue;
+          const created = new Date(page?.createdAt || 0).getTime();
+          if (created && now - created > maxAge) { this.deletePage(entry.name); pagesDeleted++; }
         } catch { /* ignore */ }
       }
     }

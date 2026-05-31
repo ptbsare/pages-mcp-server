@@ -7,7 +7,11 @@ export declare class PagesDatabase {
     private ensureDb;
     private init;
     private save;
-    createPage(page: DeployedPage): Promise<void>;
+    createPage(page: DeployedPage & {
+        type?: string;
+        totalSize?: number;
+        locked?: boolean;
+    }): Promise<void>;
     getPageByShareId(shareId: string): Promise<DeployedPage | undefined>;
     getPageById(id: string): Promise<DeployedPage | undefined>;
     listPages(limit?: number, offset?: number): Promise<{
@@ -17,6 +21,7 @@ export declare class PagesDatabase {
     updatePage(id: string, updates: {
         name?: string;
         description?: string;
+        locked?: boolean;
     }): Promise<boolean>;
     deletePage(id: string): Promise<boolean>;
     private rowToPage;
