@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+declare global { var _otpDecryptTokens: Map<string, { expiry: number; adminUser: string }> | undefined; }
 import express, { Request, Response } from "express";
 import rateLimit from "express-rate-limit";
 import mime from "mime-types";
@@ -77,9 +79,15 @@ export function createApp(config: ServerConfig) {
   const db = new PagesDatabase(config.dbPath);
   const storage = new FileStorage(config.storagePath);
 
-  // ─── Global middleware ───────────────────────────────────
-  // Global body limit: 1MB (prevents memory exhaustion)
-  app.use(express.json({ limit: "1mb" }));
+  // ─── Body parsers ──────────────────────────────────────
+  // Default: 1MB for most endpoints
+  const defaultParser = express.json({ limit: "1mb" });
+  // Deploy: 100MB for zip uploads
+  const deployBodyParser = express.json({ limit: "100mb" });
+  // Deploy routes need larger body — register BEFORE global default
+  app.use("/api/deploy", deployBodyParser);
+  // Apply default parser globally (won't override /api/deploy)
+  app.use(defaultParser);
   // CORS: only allow same-origin requests (no cross-origin API access)
   app.use((req, res, next) => {
     const origin = req.headers.origin;
@@ -213,8 +221,6 @@ export function createApp(config: ServerConfig) {
 
   // ─── 2. Deploy API (Bearer token) ────────────────────────
   const deployAuth = bearerAuth(db);
-  // Deploy endpoints allow larger body (5MB for zip uploads)
-  const deployBodyParser = express.json({ limit: "5mb" });
 
   app.post("/api/deploy/html", deployAuth, deployLimiter, deployBodyParser, (req: Request, res: Response) => {
     try {
@@ -318,6 +324,42 @@ export function createApp(config: ServerConfig) {
     }
   });
 
+  // ─── OTP Secret Decrypt ───────────────────────────────
+  app.post("/api/admin/otp/decrypt", adminAuth, csrfProtection, adminLimiter, async (req: Request, res: Response) => {
+    try {
+      const { encSecret, token } = req.body;
+      if (!encSecret || !token) {
+        res.status(400).json({ error: "Missing parameters" }); return;
+      }
+      const tokenStore = globalThis._otpDecryptTokens;
+      if (!tokenStore || !tokenStore.has(token)) {
+        res.status(403).json({ error: "Invalid or expired decrypt token" }); return;
+      }
+      const tokenData = tokenStore.get(token)!;
+      if (tokenData.expiry < Date.now()) {
+        tokenStore.delete(token);
+        res.status(403).json({ error: "Decrypt token expired" }); return;
+      }
+      const parts = encSecret.split(":");
+      if (parts.length !== 3) {
+        res.status(400).json({ error: "Invalid encrypted secret format" }); return;
+      }
+      const encKey = crypto.createHash("sha256").update(config.adminPassword + "-otp-enc").digest();
+      const iv = Buffer.from(parts[0], "hex");
+      const authTag = Buffer.from(parts[1], "hex");
+      const encrypted = Buffer.from(parts[2], "hex");
+      const decipher = crypto.createDecipheriv("aes-256-gcm", encKey, iv);
+      decipher.setAuthTag(authTag);
+      let decrypted = decipher.update(encrypted).toString("utf8");
+      decrypted += decipher.final("utf8");
+      tokenStore.delete(token);
+      res.json({ secret: decrypted });
+    } catch (err: any) {
+      console.error('OTP decrypt error:', err);
+      res.status(500).json({ error: "Decryption failed" });
+    }
+  });
+
   // Generate OTP secret (returns secret + QR code as base64 data URL)
   app.post("/api/admin/otp/setup", adminAuth, csrfProtection, adminLimiter, async (req: Request, res: Response) => {
     try {
@@ -331,7 +373,14 @@ export function createApp(config: ServerConfig) {
         margin: 2,
         color: { dark: "#1f2937", light: "#ffffff" },
       });
-      res.json({ otpauthUrl, qrDataUrl });
+      // Encrypt OTP secret before sending (defense in depth)
+      const encKey = crypto.createHash("sha256").update(config.adminPassword + "-otp-enc").digest();
+      const iv = crypto.randomBytes(12);
+      const cipher = crypto.createCipheriv("aes-256-gcm", encKey, iv);
+      let encrypted = cipher.update(secret, "utf8", "hex");
+      encrypted += cipher.final("hex");
+      const authTag = cipher.getAuthTag().toString("hex");
+      res.json({ otpauthUrl, qrDataUrl, encSecret: iv.toString("hex") + ":" + authTag + ":" + encrypted });
     } catch (err: any) {
       console.error('OTP setup error:', err);
       res.status(500).json({ error: "Failed to setup OTP" } as ErrorResponse);
@@ -452,9 +501,25 @@ export function createApp(config: ServerConfig) {
   });
 
   // ─── 5. Admin Dashboard (served at /) ────────────────────
-  app.get("/", adminAuth, otpMiddleware, (_req: Request, res: Response) => {
+  app.get("/", adminAuth, otpMiddleware, (req: Request, res: Response) => {
+    // Generate a short-lived OTP decrypt token
+    // This token allows the frontend to decrypt OTP secrets without exposing the admin password
+    const decryptToken = crypto.randomBytes(32).toString("hex");
+    const tokenExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
+    // Store in memory (in production, use a proper cache with TTL)
+    if (!globalThis._otpDecryptTokens) globalThis._otpDecryptTokens = new Map();
+    globalThis._otpDecryptTokens.set(decryptToken, { expiry: tokenExpiry, adminUser: config.adminUsername });
+    // Clean old tokens periodically
+    if (globalThis._otpDecryptTokens.size > 1000) {
+      const now = Date.now();
+      for (const [k, v] of globalThis._otpDecryptTokens) {
+        if (v.expiry < now) globalThis._otpDecryptTokens.delete(k);
+      }
+    }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(getAdminHtml(config));
+    const html = getAdminHtml(config);
+    // Inject decrypt token into the HTML
+    res.send(html.replace('__DECRYPT_TOKEN__', decryptToken));
   });
 
   // Backward compat: /admin → /
@@ -738,9 +803,13 @@ function getAdminHtml(config: ServerConfig): string {
 
   <script>
     let pages = [], tokens = [], editingId = null, otpEnabled = false;
+    window._otpDecryptToken = '__DECRYPT_TOKEN__';
 
-    // CSRF token management
+    // Store admin auth for OTP secret decryption
+    // Basic Auth credentials are available from the browser's auth cache
+    // We use a session-based approach: fetch a CSRF token which also confirms auth
     let _csrfToken = '';
+    const _otpDecryptToken = '__DECRYPT_TOKEN__';
     async function refreshCsrfToken() {
       try {
         const r = await fetch('/api/admin/csrf-token');
@@ -925,7 +994,21 @@ function getAdminHtml(config: ServerConfig): string {
       if (data.qrDataUrl) {
         document.getElementById('otpQrImg').src = data.qrDataUrl;
       }
-      // Note: secret is not returned by server for security
+      // Decrypt OTP secret using decrypt token
+      if (data.encSecret && window._otpDecryptToken) {
+        try {
+          const resp = await fetch('/api/admin/otp/decrypt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ encSecret: data.encSecret, token: window._otpDecryptToken })
+          });
+          const decData = await resp.json();
+          if (decData.secret) {
+            const content = document.getElementById('otpContent');
+            content.innerHTML += \`<p style="margin-top:8px;font-size:12px;color:var(--text3);">Can't scan? Secret: <code>\${decData.secret}</code></p>\`;
+          }
+        } catch(e) { console.error('Decrypt failed:', e); }
+      }
     }
 
     async function verifyOtp() {

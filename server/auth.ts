@@ -9,10 +9,9 @@ function safeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
   if (bufA.length !== bufB.length) {
-    // Still do a comparison to avoid leaking length info
-    crypto.timingSafeEqual(bufA, bufA);
     return false;
   }
+  if (bufA.length === 0) return true;
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
@@ -61,7 +60,7 @@ export function basicAuth(username: string, password: string) {
       return;
     }
 
-    const decoded = Buffer.from(authHeader.slice(6), "utf-8").toString("utf-8");
+    const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf-8");
     const colonIdx = decoded.indexOf(":");
     if (colonIdx === -1) {
       res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');

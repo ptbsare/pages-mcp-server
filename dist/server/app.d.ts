@@ -1,3 +1,9 @@
+declare global {
+    var _otpDecryptTokens: Map<string, {
+        expiry: number;
+        adminUser: string;
+    }> | undefined;
+}
 import { PagesDatabase } from "./db.js";
 import { FileStorage } from "./storage.js";
 import type { ServerConfig } from "../shared/types.js";
