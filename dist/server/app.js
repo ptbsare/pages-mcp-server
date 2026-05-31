@@ -162,7 +162,7 @@ export function createApp(config) {
     app.get("/s/:shareId", async (req, res) => {
         const { shareId } = req.params;
         // Validate shareId format (alphanumeric + hyphen only)
-        if (!/^[a-zA-Z0-9_-]+$/.test(shareId)) {
+        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
             res.status(400).send("<h1>400 - Bad Request</h1>");
             return;
         }
@@ -183,7 +183,7 @@ export function createApp(config) {
             return;
         }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'");
+        res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'");
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "DENY");
         res.setHeader("Referrer-Policy", "no-referrer");
@@ -192,7 +192,7 @@ export function createApp(config) {
     });
     app.get("/s/:shareId/*", async (req, res) => {
         const { shareId } = req.params;
-        if (!/^[a-zA-Z0-9_-]+$/.test(shareId)) {
+        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
             res.status(400).send("<h1>400 - Bad Request</h1>");
             return;
         }
@@ -233,7 +233,10 @@ export function createApp(config) {
         }
         const mimeType = mime.lookup(fullPath) || "application/octet-stream";
         res.setHeader("Content-Type", mimeType);
+        // CSP for sub-resources: no scripts, no inline styles
+        res.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'");
         res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("X-Frame-Options", "DENY");
         res.sendFile(fullPath);
     });
     // ─── 2. Deploy API (Bearer token) ────────────────────────
@@ -561,10 +564,16 @@ export function createApp(config) {
             }
         }
         const publicUrl = buildUrl(config.domain, config.port);
-        // Inject dynamic values into HTML template
-        let html = adminHtmlTemplate
-            .replace('__DECRYPT_TOKEN__', decryptToken)
-            .replace('__DOMAIN_URL__', publicUrl);
+        // Set decrypt token as httpOnly cookie (not accessible via JS, prevents XSS theft)
+        res.cookie('otp_decrypt', decryptToken, {
+            httpOnly: true,
+            secure: config.domain.startsWith('https'),
+            sameSite: 'strict',
+            maxAge: 5 * 60 * 1000, // 5 minutes
+            path: '/api/admin/otp',
+        });
+        // Inject only domain URL into HTML
+        let html = adminHtmlTemplate.replace('__DOMAIN_URL__', publicUrl);
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.send(html);
     });

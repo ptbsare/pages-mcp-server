@@ -237,7 +237,7 @@
   <script>
     let pages = [], tokens = [], editingId = null, otpEnabled = false;
     let _csrfToken = '';
-    const _otpDecryptToken = '__DECRYPT_TOKEN__';
+    // OTP decrypt token is in httpOnly cookie (not in HTML for security)
     const _domainUrl = '__DOMAIN_URL__';
 
     document.getElementById('domainDisplay').textContent = _domainUrl;
@@ -420,12 +420,13 @@
       if (data.qrDataUrl) {
         document.getElementById('otpQrImg').src = data.qrDataUrl;
       }
-      if (data.encSecret && _otpDecryptToken) {
+      if (data.encSecret) {
         try {
+          // Decrypt token is in httpOnly cookie, sent automatically
           const resp = await fetch('/api/admin/otp/decrypt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-            body: JSON.stringify({ encSecret: data.encSecret, token: _otpDecryptToken })
+            body: JSON.stringify({ encSecret: data.encSecret })
           });
           const decData = await resp.json();
           if (decData.secret) {
