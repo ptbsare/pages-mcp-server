@@ -13,26 +13,13 @@
     "url": "https://github.com/ptbsare/pages-mcp-server/issues"
   },
   "homepage": "https://github.com/ptbsare/pages-mcp-server#readme",
-  "keywords": [
-    "mcp",
-    "static-site",
-    "deploy",
-    "edgeone",
-    "pages",
-    "model-context-protocol"
-  ],
+  "keywords": ["mcp", "static-site", "deploy", "edgeone", "pages", "model-context-protocol"],
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
-  "files": [
-    "dist/",
-    "LICENSE",
-    "README.md"
-  ],
-  "bin": {
-    "pages-mcp": "./dist/cli.js"
-  },
+  "files": ["dist/", "server/public/", "LICENSE", "README.md"],
+  "bin": { "pages-mcp": "./dist/cli.js" },
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js",
@@ -40,7 +27,7 @@
     "./client": "./dist/client/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/server/public && cp server/public/*.html dist/server/public/",
     "prepare": "npm run build",
     "dev:server": "tsx server/index.ts",
     "dev:client": "tsx client/src/cli.ts",
@@ -71,7 +58,5 @@
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "engines": { "node": ">=18.0.0" }
 }
