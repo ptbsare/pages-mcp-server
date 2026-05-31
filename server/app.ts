@@ -236,63 +236,312 @@ export function createApp(config: ServerConfig) {
     res.sendFile(fullPath);
   });
 
-  // ─── File Sharing: /f/:shareId ──────────────────────────
+  // ─── File Share Routes ──────────────────────────────────
   const shareHtmlPath = path.resolve(process.cwd(), "server", "public", "share.html");
   let shareHtmlTemplate = "";
   try { shareHtmlTemplate = fs.readFileSync(shareHtmlPath, "utf-8"); } catch { console.error("share.html not found"); }
 
-  // File share page: /f/:shareId or /f/:shareId/filename
-  app.get("/f/:shareId/:fileName?", async (req: Request, res: Response) => {
+  // IMPORTANT: /list and /raw routes must be registered BEFORE /f/:shareId
+  // so they are matched first by Express.
+
+  // List directory contents (JSON API)
+  app.get("/f/:shareId/list", async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
+    const meta = storage.getShareMeta(shareId);
+    if (!meta) { res.status(404).json({ error: "Not found" }); return; }
+    const pageDir = path.join(config.storagePath, shareId);
+    const entries = fs.readdirSync(pageDir, { withFileTypes: true });
+    const result = {
+      folderName: meta.folderName,
+      currentPath: "",
+      totalSize: meta.totalSize || 0,
+      entries: entries.map(e => {
+        if (e.name === ".meta") return null;
+        const p = path.join(pageDir, e.name);
+        const s = fs.lstatSync(p);
+        if (s.isSymbolicLink()) return null;
+        return {
+          name: e.name,
+          isDirectory: e.isDirectory(),
+          size: e.isDirectory() ? 0 : s.size,
+          fileCount: e.isDirectory() ? fs.readdirSync(p).length : 0,
+        };
+      }).filter(Boolean),
+    };
+    res.json(result);
+  });
+
+  // List subdirectory contents
+  app.get("/f/:shareId/list/**", async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
+    const meta = storage.getShareMeta(shareId);
+    if (!meta) { res.status(404).json({ error: "Not found" }); return; }
+    const subPath = req.params[0] || "";
+    const dirPath = path.join(config.storagePath, shareId, subPath);
+    const resolvedDir = path.resolve(dirPath);
+    const shareRoot = path.resolve(path.join(config.storagePath, shareId));
+    if (!resolvedDir.startsWith(shareRoot + path.sep) && resolvedDir !== shareRoot) {
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+    if (!fs.existsSync(resolvedDir) || !fs.statSync(resolvedDir).isDirectory()) {
+      res.status(404).json({ error: "Directory not found" }); return;
+    }
+    const entries = fs.readdirSync(resolvedDir, { withFileTypes: true });
+    const result = {
+      folderName: meta.folderName,
+      currentPath: subPath,
+      totalSize: meta.totalSize || 0,
+      entries: entries.map(e => {
+        if (e.name === ".meta") return null;
+        const p = path.join(resolvedDir, e.name);
+        const s = fs.lstatSync(p);
+        if (s.isSymbolicLink()) return null;
+        return {
+          name: e.name,
+          isDirectory: e.isDirectory(),
+          size: e.isDirectory() ? 0 : s.size,
+          fileCount: e.isDirectory() ? fs.readdirSync(p).length : 0,
+        };
+      }).filter(Boolean),
+    };
+    res.json(result);
+  });
+
+  // Download file or zip
+  app.get("/f/:shareId/raw", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
     const meta = storage.getShareMeta(shareId);
     if (!meta) { res.status(404).send("Not found"); return; }
-    const pageDir = path.join(config.storagePath, shareId);
-    const publicUrl = buildUrl(config.domain, config.outPort);
-    const downloadName = meta.fileName || meta.zipName || "download";
-    const downloadUrl = `/f/${shareId}/raw/${encodeURIComponent(downloadName)}`;
-    let content = "";
     if (meta.type === "file") {
-      const filePath = path.join(pageDir, meta.fileName);
-      const ext = path.extname(meta.fileName).toLowerCase();
-      const isImage = [".jpg",".jpeg",".png",".gif",".webp",".svg",".bmp",".ico"].includes(ext);
-      const isText = [".txt",".md",".json",".js",".ts",".css",".html",".xml",".yaml",".yml",".log",".csv",".sh",".py",".java",".c",".cpp",".h",".go",".rs"].includes(ext);
-      if (isImage) {
-        content = `<div class="preview"><img src="${downloadUrl}" alt="${meta.fileName}"></div>`;
-      } else if (isText) {
-        try {
-          const textContent = fs.readFileSync(filePath, "utf-8");
-          const escaped = textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-          content = `<div class="preview"><pre>${escaped}</pre></div>`;
-        } catch { content = `<div class="preview"><div class="placeholder"><div class="icon">📄</div><p>Cannot preview this file</p></div></div>`; }
-      } else {
-        content = `<div class="preview"><div class="placeholder"><div class="icon">📦</div><p>${meta.fileName}</p><p style="font-size:12px;color:#64748b;margin-top:8px;">${meta.fileSize} bytes</p></div></div>`;
-      }
-      content += `<div class="download-all"><a href="${downloadUrl}" download="${meta.fileName}" class="btn btn-primary">⬇️ Download ${meta.fileName}</a></div>`;
-    } else if (meta.type === "folder") {
-      content = `<div class="card"><div class="card-header"><h2>📁 ${meta.folderName} (${meta.fileCount} files)</h2></div><div class="download-all"><a href="${downloadUrl}" download="${meta.zipName}" class="btn btn-primary">⬇️ Download All as Zip (${meta.zipSize} bytes)</a></div></div>`;
+      const filePath = path.join(config.storagePath, shareId, meta.fileName);
+      res.setHeader("Content-Disposition", `attachment; filename="${meta.fileName}"`);
+      res.sendFile(filePath);
+    } else {
+      // Zip the entire share directory
+      const AdmZip = (await import("adm-zip")).default;
+      const zip = new AdmZip();
+      const pageDir = path.join(config.storagePath, shareId);
+      const addDir = (dir: string, zipPath: string) => {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (e.name === ".meta") continue;
+          const sp = path.join(dir, e.name);
+          if (fs.lstatSync(sp).isSymbolicLink()) continue;
+          if (e.isDirectory()) addDir(sp, zipPath + e.name + "/");
+          else zip.addLocalFile(sp, zipPath + e.name);
+        }
+      };
+      addDir(pageDir, "");
+      const zipName = (meta.folderName || shareId) + ".zip";
+      res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+      res.setHeader("Content-Type", "application/zip");
+      res.send(zip.toBuffer());
     }
+  });
+
+  app.get("/f/:shareId/raw/**", async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
+    const meta = storage.getShareMeta(shareId);
+    if (!meta) { res.status(404).send("Not found"); return; }
+    const filePath = req.params[0] || "";
+    const isZip = req.query.zip === "1";
+    const pageDir = path.join(config.storagePath, shareId);
+    if (isZip) {
+      const AdmZip = (await import("adm-zip")).default;
+      const zip = new AdmZip();
+      const zipSource = path.join(pageDir, filePath);
+      if (!fs.existsSync(zipSource)) { res.status(404).send("Not found"); return; }
+      const addDir = (dir: string, zipPath: string) => {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (e.name === ".meta") continue;
+          const sp = path.join(dir, e.name);
+          if (fs.lstatSync(sp).isSymbolicLink()) continue;
+          if (e.isDirectory()) addDir(sp, zipPath + e.name + "/");
+          else zip.addLocalFile(sp, zipPath + e.name);
+        }
+      };
+      if (fs.statSync(zipSource).isDirectory()) addDir(zipSource, "");
+      else zip.addLocalFile(zipSource, path.basename(filePath));
+      const zipName = (filePath ? path.basename(filePath) : meta.folderName || shareId) + ".zip";
+      res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+      res.setHeader("Content-Type", "application/zip");
+      res.send(zip.toBuffer());
+    } else {
+      const resolvedFile = path.resolve(pageDir, filePath);
+      if (!resolvedFile.startsWith(pageDir + path.sep)) { res.status(403).send("Forbidden"); return; }
+      if (!fs.existsSync(resolvedFile) || !fs.statSync(resolvedFile).isFile()) { res.status(404).send("File not found"); return; }
+      res.setHeader("Content-Disposition", `attachment; filename="${path.basename(filePath)}"`);
+      res.sendFile(resolvedFile);
+    }
+  });
+
+  // Upload file to share directory
+  app.post("/f/:shareId/upload", async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
+    const meta = storage.getShareMeta(shareId);
+    if (!meta) { res.status(404).json({ error: "Not found" }); return; }
+    const pageDir = path.join(config.storagePath, shareId);
+    const fileName = String(req.query.filename || `upload-${Date.now()}`);
+    const destPath = path.join(pageDir, fileName);
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => { fs.writeFileSync(destPath, Buffer.concat(chunks)); res.json({ success: true, fileName }); });
+    req.on("error", () => res.status(500).json({ error: "Upload failed" }));
+  });
+
+  app.post("/f/:shareId/upload/**", async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
+    const meta = storage.getShareMeta(shareId);
+    if (!meta) { res.status(404).json({ error: "Not found" }); return; }
+    const subPath = req.params[0] || "";
+    const uploadDir = path.join(config.storagePath, shareId, subPath);
+    const resolvedDir = path.resolve(uploadDir);
+    const shareRoot = path.resolve(path.join(config.storagePath, shareId));
+    if (!resolvedDir.startsWith(shareRoot + path.sep) && resolvedDir !== shareRoot) {
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+    const fileName = String(req.query.filename || `upload-${Date.now()}`);
+    const destPath = path.join(resolvedDir, fileName);
+    if (!fs.existsSync(resolvedDir)) fs.mkdirSync(resolvedDir, { recursive: true });
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => { fs.writeFileSync(destPath, Buffer.concat(chunks)); res.json({ success: true, fileName }); });
+    req.on("error", () => res.status(500).json({ error: "Upload failed" }));
+  });
+
+  // Share page (must be LAST among /f/:shareId routes)
+  app.get("/f/:shareId", async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
+    const meta = storage.getShareMeta(shareId);
+    if (!meta) { res.status(404).send("Not found"); return; }
+    if (meta.type === "file") {
+      // Single file: redirect to direct download
+      res.redirect(302, `/f/${shareId}/raw/${encodeURIComponent(meta.fileName)}`);
+      return;
+    }
+    // Folder: render share page
     const html = shareHtmlTemplate
-      .replace(/__TITLE__/g, meta.fileName || meta.folderName || "File Share")
-      .replace(/__META__/g, `${meta.type === "file" ? "Single file" : `${meta.fileCount} files`} · ${meta.fileSize || meta.zipSize || 0} bytes · ${meta.createdAt}`)
-      .replace(/__CONTENT__/g, content);
+      .replace(/__TITLE__/g, meta.folderName || "File Share")
+      .replace(/__META__/g, `${meta.fileCount} files · ${meta.totalSize || 0} bytes · ${meta.createdAt}`)
+      .replace(/__SHARE_ID__/g, shareId)
+      .replace(/__CONTENT__/g, ""); // Content loaded via JS
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(html);
   });
 
-  // File download/raw endpoint: /f/:shareId/raw or /f/:shareId/raw/filename
-  app.get("/f/:shareId/raw/:fileName?", async (req: Request, res: Response) => {
+  // List directory contents (JSON API for share page)
+  app.get("/f/:shareId/list/**", async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
+    const meta = storage.getShareMeta(shareId);
+    if (!meta) { res.status(404).json({ error: "Not found" }); return; }
+    const subPath = req.params[0] || "";
+    const dirPath = path.join(config.storagePath, shareId, subPath);
+    const resolvedDir = path.resolve(dirPath);
+    const shareRoot = path.resolve(path.join(config.storagePath, shareId));
+    if (!resolvedDir.startsWith(shareRoot + path.sep) && resolvedDir !== shareRoot) {
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+    if (!fs.existsSync(resolvedDir) || !fs.statSync(resolvedDir).isDirectory()) {
+      res.status(404).json({ error: "Directory not found" }); return;
+    }
+    const entries = fs.readdirSync(resolvedDir, { withFileTypes: true });
+    const result = {
+      folderName: meta.folderName,
+      currentPath: subPath,
+      totalSize: meta.totalSize || 0,
+      entries: entries.map(e => {
+        const p = path.join(resolvedDir, e.name);
+        const s = fs.lstatSync(p);
+        if (s.isSymbolicLink()) return null;
+        return {
+          name: e.name,
+          isDirectory: e.isDirectory(),
+          size: e.isDirectory() ? 0 : s.size,
+          fileCount: e.isDirectory() ? fs.readdirSync(p).length : 0,
+        };
+      }).filter(Boolean),
+    };
+    res.json(result);
+  });
+
+  // Download file or zip
+  app.get("/f/:shareId/raw/**", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
     const meta = storage.getShareMeta(shareId);
     if (!meta) { res.status(404).send("Not found"); return; }
+    const filePath = req.params[0] || "";
+    const isZip = req.query.zip === "1" || !filePath;
     const pageDir = path.join(config.storagePath, shareId);
-    const fileName = meta.fileName || meta.zipName;
-    const filePath = path.join(pageDir, fileName);
-    if (!fs.existsSync(filePath)) { res.status(404).send("File not found"); return; }
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-    res.setHeader("Content-Type", "application/octet-stream");
-    res.sendFile(filePath);
+    if (isZip) {
+      // Zip the entire share directory (or a subdirectory if filePath is a dir)
+      const AdmZip = require("adm-zip");
+      const zip = new AdmZip();
+      const zipSource = filePath ? path.join(pageDir, filePath) : pageDir;
+      if (!fs.existsSync(zipSource)) { res.status(404).send("Not found"); return; }
+      if (fs.statSync(zipSource).isDirectory()) {
+        const addDir = (dir: string, zipPath: string) => {
+          for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            const sp = path.join(dir, e.name);
+            if (fs.lstatSync(sp).isSymbolicLink()) continue;
+            if (e.isDirectory()) addDir(sp, zipPath + e.name + "/");
+            else zip.addLocalFile(sp, zipPath + e.name);
+          }
+        };
+        addDir(zipSource, "");
+      } else {
+        zip.addLocalFile(zipSource, path.basename(filePath));
+      }
+      const zipName = (filePath ? path.basename(filePath) : meta.folderName || shareId) + ".zip";
+      res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+      res.setHeader("Content-Type", "application/zip");
+      res.send(zip.toBuffer());
+    } else {
+      // Single file download
+      const resolvedFile = path.resolve(pageDir, filePath);
+      if (!resolvedFile.startsWith(pageDir + path.sep)) { res.status(403).send("Forbidden"); return; }
+      if (!fs.existsSync(resolvedFile) || !fs.statSync(resolvedFile).isFile()) { res.status(404).send("File not found"); return; }
+      res.setHeader("Content-Disposition", `attachment; filename="${path.basename(filePath)}"`);
+      res.sendFile(resolvedFile);
+    }
+  });
+
+  // Upload file to share directory
+  app.post("/f/:shareId/upload/**", async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
+    const meta = storage.getShareMeta(shareId);
+    if (!meta) { res.status(404).json({ error: "Not found" }); return; }
+    const subPath = req.params[0] || "";
+    const uploadDir = path.join(config.storagePath, shareId, subPath);
+    const resolvedDir = path.resolve(uploadDir);
+    const shareRoot = path.resolve(path.join(config.storagePath, shareId));
+    if (!resolvedDir.startsWith(shareRoot + path.sep) && resolvedDir !== shareRoot) {
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+    // Handle multipart upload
+    const contentType = req.headers["content-type"] || "";
+    if (!contentType.includes("multipart/form-data")) {
+      res.status(400).json({ error: "Expected multipart/form-data" }); return;
+    }
+    // Simple file upload via busboy or similar — for now, write raw body
+    const fileName = String(req.query.filename || `upload-${Date.now()}`);
+    const destPath = path.join(resolvedDir, fileName);
+    if (!fs.existsSync(resolvedDir)) fs.mkdirSync(resolvedDir, { recursive: true });
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      fs.writeFileSync(destPath, Buffer.concat(chunks));
+      res.json({ success: true, fileName });
+    });
+    req.on("error", () => res.status(500).json({ error: "Upload failed" }));
   });
 
   // ─── 2. Deploy API (Bearer token) ────────────────────────

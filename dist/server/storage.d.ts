@@ -56,14 +56,18 @@ export declare class FileStorage {
         fileSize: number;
     };
     /**
-     * Deploy a folder as a zip for sharing. Returns the share ID.
+     * Deploy a folder for sharing (preserves directory structure).
+     * Returns the share ID.
      */
-    deployFolderAsZip(folderPath: string, name?: string): {
+    deployFolder(folderPath: string, name?: string): {
         shareId: string;
         fileCount: number;
-        zipSize: number;
-        zipName: string;
+        totalSize: number;
     };
+    /**
+     * Get total size of a directory.
+     */
+    private getDirSize;
     private addToZip;
     /**
      * Get share metadata.

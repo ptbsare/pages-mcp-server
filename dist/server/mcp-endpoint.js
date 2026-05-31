@@ -294,21 +294,20 @@ export function createMcpHandler(config, db, storage) {
                         }
                         const stat = fs.statSync(filePath);
                         if (stat.isFile()) {
-                            // Single file share
+                            // Single file: return direct download link (no share page)
                             const result = storage.deployFile(filePath, shareName);
-                            const url = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}/${encodeURIComponent(result.fileName)}`;
-                            res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `✅ File shared successfully!\n\nURL: ${url}\nFile: ${result.fileName}\nSize: ${result.fileSize} bytes` }] } });
+                            const dlUrl = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}/raw/${encodeURIComponent(result.fileName)}`;
+                            res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `✅ File shared!\n\nDirect download: ${dlUrl}\nFile: ${result.fileName}\nSize: ${result.fileSize} bytes` }] } });
                             triggerCleanup(storage);
                         }
                         else if (stat.isDirectory()) {
-                            // Folder share (zip)
-                            const result = storage.deployFolderAsZip(filePath, shareName);
-                            const safeName = encodeURIComponent(result.zipName);
-                            const url = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}/${safeName}`;
-                            res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `✅ Folder shared successfully!\n\nURL: ${url}\nFiles: ${result.fileCount}\nZip size: ${result.zipSize} bytes` }] } });
+                            // Folder: return share page URL (browse nested dirs, download individual files, upload, or zip download)
+                            const result = storage.deployFolder(filePath, shareName);
+                            const shareUrl = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}`;
+                            res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `✅ Folder shared!\n\nShare page: ${shareUrl}\nFiles: ${result.fileCount}\nTotal size: ${result.totalSize} bytes` }] } });
+                            triggerCleanup(storage);
                         }
                         else {
-                            triggerCleanup(storage);
                             res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "Error: Path is neither a file nor a directory" }], isError: true } });
                         }
                     }

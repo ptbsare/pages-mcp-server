@@ -259,8 +259,8 @@ export class FileStorage {
         if (!stat.isFile()) {
             throw new Error(`Path is not a file: ${filePath}`);
         }
-        // Check size limit (4MB for single file)
-        const MAX_SIZE = 4 * 1024 * 1024;
+        // Check size limit (1GB for single file)
+        const MAX_SIZE = 1024 * 1024 * 1024;
         if (stat.size > MAX_SIZE) {
             throw new Error(`File too large (${stat.size} bytes). Max: ${MAX_SIZE} bytes`);
         }
@@ -280,9 +280,10 @@ export class FileStorage {
         return { shareId, fileName, fileSize: stat.size };
     }
     /**
-     * Deploy a folder as a zip for sharing. Returns the share ID.
+     * Deploy a folder for sharing (preserves directory structure).
+     * Returns the share ID.
      */
-    deployFolderAsZip(folderPath, name) {
+    deployFolder(folderPath, name) {
         if (!fs.existsSync(folderPath)) {
             throw new Error(`Folder not found: ${folderPath}`);
         }
@@ -290,34 +291,48 @@ export class FileStorage {
         if (!stat.isDirectory()) {
             throw new Error(`Path is not a directory: ${folderPath}`);
         }
-        // Create zip
-        const AdmZip = require("adm-zip");
-        const zip = new AdmZip();
-        this.addToZip(zip, folderPath, "");
-        const zipBuffer = zip.toBuffer();
-        // Check size limit (1GB for zip)
+        // Check total size (1GB limit)
         const MAX_SIZE = 1024 * 1024 * 1024;
-        if (zipBuffer.length > MAX_SIZE) {
-            throw new Error(`Zip too large (${zipBuffer.length} bytes). Max: ${MAX_SIZE} bytes`);
+        const totalSize = this.getDirSize(folderPath);
+        if (totalSize > MAX_SIZE) {
+            throw new Error(`Folder too large (${totalSize} bytes). Max: ${MAX_SIZE} bytes`);
         }
         const shareId = nanoid(12);
         const dir = this.getPageDir(shareId);
         fs.mkdirSync(dir, { recursive: true });
-        const zipName = (name || path.basename(folderPath)) + ".zip";
-        fs.writeFileSync(path.join(dir, zipName), zipBuffer);
-        // Count files
-        const fileCount = this.listFiles(folderPath).length;
+        // Copy folder contents preserving structure
+        this.copyDir(folderPath, dir);
+        const fileCount = this.listFiles(dir).length;
         // Store metadata
         fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
             type: "folder",
             folderName: path.basename(folderPath),
             fileCount,
-            zipName,
-            zipSize: zipBuffer.length,
+            totalSize,
             createdAt: new Date().toISOString(),
             locked: false,
         }));
-        return { shareId, fileCount, zipSize: zipBuffer.length, zipName };
+        return { shareId, fileCount, totalSize };
+    }
+    /**
+     * Get total size of a directory.
+     */
+    getDirSize(dirPath) {
+        let size = 0;
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+            const p = path.join(dirPath, entry.name);
+            const lstat = fs.lstatSync(p);
+            if (lstat.isSymbolicLink())
+                continue;
+            if (entry.isDirectory()) {
+                size += this.getDirSize(p);
+            }
+            else {
+                size += lstat.size;
+            }
+        }
+        return size;
     }
     addToZip(zip, dirPath, zipPath) {
         const entries = fs.readdirSync(dirPath, { withFileTypes: true });

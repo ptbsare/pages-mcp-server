@@ -7,40 +7,55 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
-    .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 20px 24px; border-bottom: 1px solid #475569; }
-    .header h1 { font-size: 18px; font-weight: 600; word-break: break-all; }
-    .header .meta { font-size: 12px; color: #94a3b8; margin-top: 4px; }
-    .container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+    .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 16px 20px; border-bottom: 1px solid #475569; }
+    .header h1 { font-size: 16px; font-weight: 600; word-break: break-all; }
+    .header .meta { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+    .container { max-width: 900px; margin: 0 auto; padding: 16px; }
     .card { background: #1e293b; border-radius: 12px; border: 1px solid #334155; overflow: hidden; margin-bottom: 16px; }
-    .card-header { padding: 14px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
-    .card-header h2 { font-size: 14px; font-weight: 600; color: #94a3b8; }
+    .card-header { padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .card-header h2 { font-size: 13px; font-weight: 600; color: #94a3b8; }
+    .breadcrumb { padding: 10px 16px; font-size: 12px; color: #64748b; border-bottom: 1px solid #334155; background: #1e293b; }
+    .breadcrumb a { color: #818cf8; text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
+    .breadcrumb span { margin: 0 4px; color: #475569; }
     .file-list { list-style: none; }
-    .file-list li { padding: 10px 16px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 12px; }
+    .file-list li { padding: 10px 16px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 10px; }
     .file-list li:last-child { border-bottom: none; }
-    .file-icon { width: 36px; height: 36px; border-radius: 8px; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-    .file-icon.img { background: #065f46; }
-    .file-icon.txt { background: #1e3a5f; }
-    .file-icon.zip { background: #7c2d12; }
-    .file-icon.doc { background: #4c1d95; }
+    .file-list li:hover { background: #334155; }
+    .icon { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; background: #334155; }
+    .icon.dir { background: #1e3a5f; }
+    .icon.img { background: #065f46; }
+    .icon.txt { background: #1e3a5f; }
+    .icon.zip { background: #7c2d12; }
     .file-info { flex: 1; min-width: 0; }
     .file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-name a { color: #e2e8f0; text-decoration: none; }
+    .file-name a:hover { color: #818cf8; }
     .file-size { font-size: 11px; color: #64748b; }
-    .file-actions { display: flex; gap: 6px; }
+    .file-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; text-decoration: none; }
     .btn-primary { background: #3b82f6; color: white; }
     .btn-primary:hover { background: #2563eb; }
     .btn-secondary { background: #334155; color: #e2e8f0; }
     .btn-secondary:hover { background: #475569; }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
     .preview { padding: 16px; text-align: center; }
     .preview img { max-width: 100%; max-height: 60vh; border-radius: 8px; }
     .preview pre { text-align: left; background: #0f172a; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 12px; line-height: 1.6; max-height: 60vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
-    .preview .placeholder { padding: 40px; color: #64748b; }
-    .preview .placeholder .icon { font-size: 48px; margin-bottom: 12px; }
-    .download-all { display: flex; justify-content: center; padding: 16px; }
+    .upload-area { padding: 16px; border: 2px dashed #475569; border-radius: 8px; text-align: center; margin: 16px; transition: border-color 0.2s; }
+    .upload-area:hover, .upload-area.dragover { border-color: #818cf8; }
+    .upload-area input[type="file"] { display: none; }
+    .upload-area label { cursor: pointer; color: #94a3b8; font-size: 13px; }
+    .upload-area label:hover { color: #e2e8f0; }
+    .upload-status { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+    .toast { position: fixed; bottom: 16px; left: 16px; right: 16px; padding: 10px 16px; border-radius: 8px; color: white; font-size: 13px; z-index: 200; text-align: center; transition: opacity 0.3s; }
+    .toast-success { background: #059669; }
+    .toast-error { background: #dc2626; }
     .empty { text-align: center; padding: 40px; color: #64748b; }
     @media (max-width: 600px) {
       .file-list li { flex-wrap: wrap; }
-      .file-actions { width: 100%; justify-content: flex-end; margin-top: 8px; }
+      .file-actions { width: 100%; justify-content: flex-end; margin-top: 6px; }
+      .card-header { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
@@ -52,15 +67,140 @@
   <div class="container">
     __CONTENT__
   </div>
+  <div id="toast" class="toast" style="display:none;"></div>
   <script>
-    function downloadFile(url, name) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+    const SHARE_ID = '__SHARE_ID__';
+    const BASE_URL = '/f/' + SHARE_ID;
+    let currentPath = '';
+
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast toast-' + type;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3000);
     }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+
+    function getFileIcon(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      if (['jpg','jpeg','png','gif','webp','svg','bmp','ico'].includes(ext)) return { cls: 'img', emoji: '🖼️' };
+      if (['txt','md','json','js','ts','css','html','xml','yaml','yml','log','csv','sh','py','java','c','cpp','h','go','rs'].includes(ext)) return { cls: 'txt', emoji: '📄' };
+      if (['zip','tar','gz','rar','7z'].includes(ext)) return { cls: 'zip', emoji: '📦' };
+      return { cls: '', emoji: '📎' };
+    }
+
+    async function loadDir(dirPath) {
+      currentPath = dirPath;
+      try {
+        const resp = await fetch(BASE_URL + '/list' + (dirPath ? '/' + dirPath : ''));
+        if (!resp.ok) { showToast('Failed to load directory', 'error'); return; }
+        const data = await resp.json();
+        renderDir(data);
+      } catch (e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    function renderDir(data) {
+      const container = document.querySelector('.container');
+      let html = '';
+
+      // Breadcrumb
+      html += '<div class="card"><div class="breadcrumb">';
+      html += `<a href="#" onclick="loadDir('');return false;">📁 ${data.folderName || 'Root'}</a>`;
+      if (data.currentPath) {
+        const parts = data.currentPath.split('/');
+        let accum = '';
+        for (const p of parts) {
+          accum += (accum ? '/' : '') + p;
+          html += `<span>/</span><a href="#" onclick="loadDir('${accum}');return false;">${p}</a>`;
+        }
+      }
+      html += '</div></div>';
+
+      // Actions bar
+      html += '<div class="card"><div class="card-header">';
+      html += `<h2>${data.entries.length} items · ${formatSize(data.totalSize)}</h2>`;
+      html += '<div style="display:flex;gap:6px;">';
+      html += `<button class="btn btn-primary btn-sm" onclick="downloadZip()">⬇️ Download All as Zip</button>`;
+      html += `<button class="btn btn-secondary btn-sm" onclick="document.getElementById('fileInput').click()">📤 Upload</button>`;
+      html += '</div></div>';
+
+      // Upload area
+      html += `<div class="upload-area" id="dropZone">`;
+      html += `<input type="file" id="fileInput" multiple onchange="handleUpload(this.files)">`;
+      html += `<label for="fileInput">📤 Click to upload files, or drag & drop here</label>`;
+      html += `<div class="upload-status" id="uploadStatus"></div></div>`;
+
+      // File list
+      if (data.entries.length === 0) {
+        html += '<div class="empty">📂 Empty folder</div>';
+      } else {
+        html += '<ul class="file-list">';
+        // Directories first
+        for (const entry of data.entries.filter(e => e.isDirectory)) {
+          html += `<li><div class="icon dir">📁</div><div class="file-info">`;
+          html += `<div class="file-name"><a href="#" onclick="loadDir('${(currentPath ? currentPath + '/' : '') + entry.name}');return false;">${entry.name}</a></div>`;
+          html += `<div class="file-size">${entry.fileCount} files · ${formatSize(entry.size)}</div></div>`;
+          html += `<div class="file-actions"><button class="btn btn-secondary btn-sm" onclick="downloadEntry('${entry.name}',true)">⬇️ Zip</button></div></li>`;
+        }
+        // Files
+        for (const entry of data.entries.filter(e => !e.isDirectory)) {
+          const icon = getFileIcon(entry.name);
+          const dlUrl = BASE_URL + '/raw' + (currentPath ? '/' + currentPath : '') + '/' + entry.name;
+          html += `<li><div class="icon ${icon.cls}">${icon.emoji}</div><div class="file-info">`;
+          html += `<div class="file-name"><a href="${dlUrl}" target="_blank" rel="noopener">${entry.name}</a></div>`;
+          html += `<div class="file-size">${formatSize(entry.size)}</div></div>`;
+          html += `<div class="file-actions"><a href="${dlUrl}" download="${entry.name}" class="btn btn-primary btn-sm">⬇️</a></div></li>`;
+        }
+        html += '</ul>';
+      }
+      html += '</div>';
+
+      container.innerHTML = html;
+
+      // Drag & drop
+      const dropZone = document.getElementById('dropZone');
+      ['dragenter','dragover'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+      ['dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
+      dropZone.addEventListener('drop', e => { e.preventDefault(); handleUpload(e.dataTransfer.files); });
+    }
+
+    async function handleUpload(files) {
+      if (!files.length) return;
+      const status = document.getElementById('uploadStatus');
+      status.textContent = 'Uploading...';
+      for (const file of files) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const resp = await fetch(BASE_URL + '/upload' + (currentPath ? '/' + currentPath : ''), { method: 'POST', body: formData });
+          if (!resp.ok) throw new Error('Upload failed for ' + file.name);
+          status.textContent = `✅ ${file.name} uploaded`;
+        } catch (e) {
+          status.textContent = `❌ ${e.message}`;
+          showToast(e.message, 'error');
+        }
+      }
+      setTimeout(() => loadDir(currentPath), 500);
+    }
+
+    function downloadEntry(name, isDir) {
+      const url = BASE_URL + '/raw' + (currentPath ? '/' + currentPath : '') + '/' + name + (isDir ? '?zip=1' : '');
+      window.location.href = url;
+    }
+
+    function downloadZip() {
+      window.location.href = BASE_URL + '/raw?zip=1';
+    }
+
+    // Initial load
+    loadDir('');
   </script>
 </body>
 </html>
