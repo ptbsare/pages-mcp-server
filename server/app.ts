@@ -347,16 +347,37 @@ export function createApp(config: ServerConfig) {
   app.post("/api/deploy/file", bearerAuth(db), express.raw({ limit: "1gb", type: "*/*" }), async (req: Request, res: Response) => {
     try {
       const fileBuffer = req.body as Buffer;
-      const fileName = String(req.query.filename || `upload-${Date.now()}`);
+      // Sanitize filename: remove path separators and control chars
+      let fileName = String(req.query.filename || `upload-${Date.now()}`);
+      fileName = fileName.replace(/[\\/]/g, "_").replace(/[\x00-\x1f]/g, "");
+      if (!fileName) fileName = `upload-${Date.now()}`;
       const isZip = fileName.toLowerCase().endsWith(".zip");
       const name = String(req.query.name || "") || undefined;
       if (isZip) {
+        // Secure zip extraction: check each entry for path traversal
         const AdmZip = (await import("adm-zip")).default;
         const zip = new AdmZip(fileBuffer);
+        const entries = zip.getEntries();
+        for (const entry of entries) {
+          if (entry.entryName.includes("..") || path.isAbsolute(entry.entryName)) {
+            throw new Error("Zip contains unsafe path: " + entry.entryName);
+          }
+        }
         const shareId = nanoid(12);
         const dir = path.join(config.storagePath, shareId);
         fs.mkdirSync(dir, { recursive: true });
         zip.extractAllTo(dir, true);
+        // Remove any symlinks created by extraction
+        const cleanDir = (d: string) => {
+          for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+            const p = path.join(d, e.name);
+            if (e.name === ".meta") continue;
+            const lstat = fs.lstatSync(p);
+            if (lstat.isSymbolicLink()) { fs.unlinkSync(p); continue; }
+            if (e.isDirectory()) cleanDir(p);
+          }
+        };
+        cleanDir(dir);
         const fileCount = storage.listFiles(dir).length;
         const totalSize = storage.getDirSize(dir);
         fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
@@ -375,7 +396,7 @@ export function createApp(config: ServerConfig) {
       if (expireDays > 0) setImmediate(() => storage.cleanupExpired(expireDays));
     } catch (err: any) {
       console.error("Upload error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Upload failed" });
     }
   });
 

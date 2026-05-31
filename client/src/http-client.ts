@@ -2,6 +2,8 @@
  * HTTP MCP Client — connects to a remote /mcp endpoint.
  * Implements the MCP client side over HTTP JSON-RPC.
  */
+import path from "path";
+import fs from "fs";
 
 export class PagesMcpHttpClient {
   private baseUrl: string;
@@ -64,13 +66,36 @@ export class PagesMcpHttpClient {
     return result.content?.[0]?.text || "No response";
   }
 
-  async deployFolder(path: string, name?: string, description?: string): Promise<string> {
-    await this.initialize();
-    const result = await this.rpcCall("tools/call", {
-      name: "deploy_folder",
-      arguments: { path, name, description },
+  async deployFolder(localPath: string, name?: string, description?: string): Promise<string> {
+    // Validate local path (SSRF prevention)
+    this.validateLocalPath(localPath);
+    if (!fs.existsSync(localPath) || !fs.statSync(localPath).isDirectory()) {
+      throw new Error(`Folder not found: ${localPath}`);
+    }
+    // Zip the folder locally and upload via REST API
+    const AdmZip = (await import("adm-zip")).default;
+    const zip = new AdmZip();
+    const addDir = (dir: string, zipPath: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const sp = path.join(dir, e.name);
+        if (fs.lstatSync(sp).isSymbolicLink()) continue;
+        if (e.isDirectory()) addDir(sp, zipPath + e.name + "/");
+        else {
+          zip.addFile(zipPath + e.name, fs.readFileSync(sp));
+        }
+      }
+    };
+    addDir(localPath, "");
+    const zipBuffer = zip.toBuffer();
+    const zipName = (name || path.basename(localPath)) + ".zip";
+    const resp = await fetch(`${this.baseUrl}/api/deploy/file?filename=${encodeURIComponent(zipName)}&name=${encodeURIComponent(name || "")}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.authToken}`, "Content-Type": "application/octet-stream" },
+      body: zipBuffer,
     });
-    return result.content?.[0]?.text || "No response";
+    if (!resp.ok) throw new Error(`Upload failed: ${await resp.text()}`);
+    const data: any = await resp.json();
+    return `✅ Folder deployed!\n\nURL: ${data.url}\nFiles: ${data.fileCount}\nSize: ${data.totalSize} bytes`;
   }
 
   async listPages(limit?: number, offset?: number): Promise<string> {
@@ -92,15 +117,41 @@ export class PagesMcpHttpClient {
   }
 
   /**
+   * Validate local path before uploading.
+   * Environment variables:
+   *   DEPLOY_ALLOW_PATHS — comma-separated list of allowed path prefixes (e.g. "/home/user/projects,/tmp")
+   *   DEPLOY_BLOCK_PATHS — comma-separated list of blocked path prefixes (default: /etc,/root,/home,/var,/usr,/proc,/sys,/dev,/boot,/bin,/sbin,/lib,/lib64)
+   *   DEPLOY_ALLOW_ALL — set to "1" to disable all path restrictions
+   */
+  private validateLocalPath(localPath: string): void {
+    if (process.env.DEPLOY_ALLOW_ALL === "1") return;
+    const resolved = path.resolve(localPath);
+    const allowPaths = (process.env.DEPLOY_ALLOW_PATHS || "").split(",").map(p => p.trim()).filter(Boolean);
+    if (allowPaths.length > 0) {
+      const allowed = allowPaths.some(prefix => resolved.startsWith(path.resolve(prefix) + "/") || resolved === path.resolve(prefix));
+      if (!allowed) throw new Error(`Path not allowed: ${localPath}. Allowed prefixes: ${allowPaths.join(", ")}`);
+      return;
+    }
+    const defaultBlocked = ["/etc","/root","/home","/var","/usr","/proc","/sys","/dev","/boot","/bin","/sbin","/lib","/lib64"];
+    const blockPaths = (process.env.DEPLOY_BLOCK_PATHS || defaultBlocked.join(",")).split(",").map(p => p.trim()).filter(Boolean);
+    for (const prefix of blockPaths) {
+      const resolvedPrefix = path.resolve(prefix);
+      if (resolved.startsWith(resolvedPrefix + "/") || resolved === resolvedPrefix) {
+        throw new Error(`Access denied: path '${localPath}' is in blocked directory '${prefix}'`);
+      }
+    }
+  }
+
+  /**
    * Deploy a local file or folder to the remote server.
    * Reads the file/folder locally, uploads via REST API.
    */
   async deployFile(localPath: string, name?: string, description?: string): Promise<string> {
-    const fs = await import("fs");
-    const path = await import("path");
     if (!fs.existsSync(localPath)) {
       throw new Error(`Path not found: ${localPath}`);
     }
+    // Validate local path (SSRF prevention)
+    this.validateLocalPath(localPath);
     const stat = fs.statSync(localPath);
     if (stat.isFile()) {
       // Single file: read and upload

@@ -44,28 +44,6 @@ export async function startStdioServer(remoteUrl, authToken) {
                     },
                 },
                 {
-                    name: "deploy_folder",
-                    description: "Deploy a local folder containing a static website (must include index.html) to the remote server. Returns a shareable URL.",
-                    inputSchema: {
-                        type: "object",
-                        properties: {
-                            path: {
-                                type: "string",
-                                description: "Absolute path to the local folder to deploy.",
-                            },
-                            name: {
-                                type: "string",
-                                description: "Optional human-readable name for the page.",
-                            },
-                            description: {
-                                type: "string",
-                                description: "Optional description for the page.",
-                            },
-                        },
-                        required: ["path"],
-                    },
-                },
-                {
                     name: "list_pages",
                     description: "List all deployed pages on the remote server.",
                     inputSchema: {
@@ -88,8 +66,26 @@ export async function startStdioServer(remoteUrl, authToken) {
                     },
                 },
                 {
+                    name: "deploy_folder",
+                    description: "Deploy a local folder containing a static website to the remote server. Recursively uploads all files preserving directory structure. The folder should contain an index.html at the root. Returns a shareable URL.",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            path: {
+                                type: "string",
+                                description: "Absolute path to the local folder to deploy.",
+                            },
+                            name: {
+                                type: "string",
+                                description: "Optional human-readable name for the page.",
+                            },
+                        },
+                        required: ["path"],
+                    },
+                },
+                {
                     name: "deploy_file",
-                    description: "Share a local file or folder to the remote server. For a single file, returns a direct download link. For a folder, preserves nested directory structure and returns a share page URL with browse, individual download, zip download, and upload capabilities. Supports drag-and-drop style file sharing.",
+                    description: "Share a local file or folder to the remote server. For a single file, returns a direct download link. For a folder, preserves nested directory structure and returns a share page URL.",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -119,11 +115,6 @@ export async function startStdioServer(remoteUrl, authToken) {
                     text = await client.deployHtml(value, pageName, description);
                     break;
                 }
-                case "deploy_folder": {
-                    const { path, name: pageName, description } = args;
-                    text = await client.deployFolder(path, pageName, description);
-                    break;
-                }
                 case "list_pages": {
                     const { limit, offset } = args;
                     text = await client.listPages(limit, offset);
@@ -132,6 +123,11 @@ export async function startStdioServer(remoteUrl, authToken) {
                 case "delete_page": {
                     const { id } = args;
                     text = await client.deletePage(id);
+                    break;
+                }
+                case "deploy_folder": {
+                    const { path, name } = args;
+                    text = await client.deployFolder(path, name);
                     break;
                 }
                 case "deploy_file": {
