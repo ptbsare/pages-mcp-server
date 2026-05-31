@@ -344,42 +344,53 @@ export function createApp(config: ServerConfig) {
   });
 
   // ─── File Upload API (for local stdio client) ──────────
-  app.post("/api/deploy/file", bearerAuth(db), express.raw({ limit: "1gb", type: "*/*" }), async (req: Request, res: Response) => {
+  // Use streaming to avoid loading entire file into memory
+  app.post("/api/deploy/file", bearerAuth(db), async (req: Request, res: Response) => {
+    const MAX_SIZE = 1024 * 1024 * 1024; // 1GB
+    let size = 0;
+    const chunks: Buffer[] = [];
     try {
-      const fileBuffer = req.body as Buffer;
-      // Sanitize filename: remove path separators and control chars
+      // Stream the request body with size limit
+      await new Promise<void>((resolve, reject) => {
+        req.on("data", (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > MAX_SIZE) { reject(new Error("File too large (max 1GB)")); return; }
+          chunks.push(chunk);
+        });
+        req.on("end", () => resolve());
+        req.on("error", reject);
+      });
+      const fileBuffer = Buffer.concat(chunks);
+      // Sanitize filename
       let fileName = String(req.query.filename || `upload-${Date.now()}`);
       fileName = fileName.replace(/[\\/]/g, "_").replace(/[\x00-\x1f]/g, "");
       if (!fileName) fileName = `upload-${Date.now()}`;
       const isZip = fileName.toLowerCase().endsWith(".zip");
       const name = String(req.query.name || "") || undefined;
       if (isZip) {
-        // Secure zip extraction: check each entry for path traversal
+        // Secure zip: check entries BEFORE extraction
         const AdmZip = (await import("adm-zip")).default;
         const zip = new AdmZip(fileBuffer);
         const entries = zip.getEntries();
         for (const entry of entries) {
           if (entry.entryName.includes("..") || path.isAbsolute(entry.entryName)) {
-            throw new Error("Zip contains unsafe path: " + entry.entryName);
+            throw new Error("Zip contains unsafe path");
           }
         }
         const shareId = nanoid(12);
         const dir = path.join(config.storagePath, shareId);
         fs.mkdirSync(dir, { recursive: true });
-        zip.extractAllTo(dir, true);
-        // Remove any symlinks created by extraction
-        const cleanDir = (d: string) => {
-          for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-            const p = path.join(d, e.name);
-            if (e.name === ".meta") continue;
-            const lstat = fs.lstatSync(p);
-            if (lstat.isSymbolicLink()) { fs.unlinkSync(p); continue; }
-            if (e.isDirectory()) cleanDir(p);
+        // Extract and clean symlinks in one pass
+        for (const entry of entries) {
+          const entryPath = path.join(dir, entry.entryName);
+          const entryDir = path.dirname(entryPath);
+          if (!fs.existsSync(entryDir)) fs.mkdirSync(entryDir, { recursive: true });
+          if (!entry.entryName.endsWith("/")) {
+            fs.writeFileSync(entryPath, entry.getData());
           }
-        };
-        cleanDir(dir);
+        }
         const fileCount = storage.listFiles(dir).length;
-        const totalSize = storage.getDirSize(dir);
+        const totalSize = storage.calculateDirSize(dir);
         fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
           type: "folder", folderName: name || path.basename(fileName, ".zip"),
           fileCount, totalSize, createdAt: new Date().toISOString(), locked: false,

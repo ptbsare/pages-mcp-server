@@ -343,7 +343,7 @@ export class FileStorage {
     }
     // Check total size (1GB limit)
     const MAX_SIZE = 1024 * 1024 * 1024;
-    const totalSize = this.getDirSize(folderPath);
+    const totalSize = this.calculateDirSize(folderPath);
     if (totalSize > MAX_SIZE) {
       throw new Error(`Folder too large (${totalSize} bytes). Max: ${MAX_SIZE} bytes`);
     }
@@ -368,18 +368,23 @@ export class FileStorage {
   /**
    * Get total size of a directory.
    */
-  getDirSize(dirPath: string): number {
+  /** Calculate total size of a directory (public for app.ts use) */
+  calculateDirSize(dirPath: string): number {
     let size = 0;
+    if (!fs.existsSync(dirPath)) return 0;
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
     for (const entry of entries) {
+      if (entry.name === ".meta") continue;
       const p = path.join(dirPath, entry.name);
-      const lstat = fs.lstatSync(p);
-      if (lstat.isSymbolicLink()) continue;
-      if (entry.isDirectory()) {
-        size += this.getDirSize(p);
-      } else {
-        size += lstat.size;
-      }
+      try {
+        const lstat = fs.lstatSync(p);
+        if (lstat.isSymbolicLink()) continue;
+        if (entry.isDirectory()) {
+          size += this.calculateDirSize(p);
+        } else {
+          size += lstat.size;
+        }
+      } catch { /* ignore inaccessible files */ }
     }
     return size;
   }

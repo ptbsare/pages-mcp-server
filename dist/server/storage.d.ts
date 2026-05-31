@@ -76,7 +76,8 @@ export declare class FileStorage {
     /**
      * Get total size of a directory.
      */
-    getDirSize(dirPath: string): number;
+    /** Calculate total size of a directory (public for app.ts use) */
+    calculateDirSize(dirPath: string): number;
     private addToZip;
     /**
      * Get share metadata.
