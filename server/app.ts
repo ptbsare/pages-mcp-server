@@ -80,9 +80,8 @@ export function createApp(config: ServerConfig) {
   const storage = new FileStorage(config.storagePath);
 
   // Load admin panel HTML template from external file
-  // Resolve admin.html: works in both dev (ts-node) and prod (compiled JS)
-  // Use process.cwd() as fallback since __dirname is not available in ESM
-  const adminHtmlPath = path.resolve(process.cwd(), "server", "public", "admin.html");
+  // Resolve admin.html relative to this file's location (works with npx, docker, etc.)
+  const adminHtmlPath = path.join(path.dirname(new URL(import.meta.url).pathname), "public", "admin.html");
   let adminHtmlTemplate = "";
   try {
     adminHtmlTemplate = fs.readFileSync(adminHtmlPath, "utf-8");
@@ -240,7 +239,7 @@ export function createApp(config: ServerConfig) {
   const sanitizeFilename = (name: string) => name.replace(/[\r\n"\\]/g, '_').replace(/[\x00-\x1f]/g, '');
 
   // ─── File Share Routes ──────────────────────────────────
-  const shareHtmlPath = path.resolve(process.cwd(), "server", "public", "share.html");
+  const shareHtmlPath = path.join(path.dirname(new URL(import.meta.url).pathname), "public", "share.html");
   let shareHtmlTemplate = "";
   try { shareHtmlTemplate = fs.readFileSync(shareHtmlPath, "utf-8"); } catch { console.error("share.html not found"); }
 
