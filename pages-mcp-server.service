@@ -17,6 +17,9 @@ Group=root
 ExecStart=/usr/bin/npx -y github:ptbsare/pages-mcp-server server --port 3000 --domain http://localhost:3000 --admin-user admin --admin-pass changeme
 
 Environment=PORT=3000
+# OUT_PORT: external port for public URLs (Docker port mapping). Defaults to PORT.
+# Example: PORT=3000 OUT_PORT=38300. Standard ports (80/443) auto-omitted from URLs.
+# Environment=OUT_PORT=38300
 Environment=DOMAIN=http://localhost:3000
 Environment=ADMIN_USERNAME=admin
 Environment=ADMIN_PASSWORD=changeme
