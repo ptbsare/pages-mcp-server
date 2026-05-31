@@ -82,15 +82,17 @@ export class PagesMcpHttpClient {
         addDir(localPath, "");
         const zipBuffer = zip.toBuffer();
         const zipName = (name || path.basename(localPath)) + ".zip";
-        const resp = await fetch(`${this.baseUrl}/api/deploy/file?filename=${encodeURIComponent(zipName)}&name=${encodeURIComponent(name || "")}`, {
+        // deploy_folder uses /api/deploy/folder which returns /s/:shareId (static web page)
+        const zipBase64 = zipBuffer.toString("base64");
+        const resp = await fetch(`${this.baseUrl}/api/deploy/folder`, {
             method: "POST",
-            headers: { Authorization: `Bearer ${this.authToken}`, "Content-Type": "application/octet-stream" },
-            body: zipBuffer,
+            headers: { Authorization: `Bearer ${this.authToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ zipBase64, name, description }),
         });
         if (!resp.ok)
             throw new Error(`Upload failed: ${await resp.text()}`);
         const data = await resp.json();
-        return `✅ Folder deployed!\n\nURL: ${data.url}\nFiles: ${data.fileCount}\nSize: ${data.totalSize} bytes`;
+        return `✅ Folder deployed!\n\nURL: ${data.url}\nID: ${data.id}\nShare ID: ${data.shareId}\nFiles: ${data.fileCount}`;
     }
     async listPages(limit, offset) {
         await this.initialize();
