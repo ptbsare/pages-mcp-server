@@ -354,16 +354,24 @@ export function createApp(config: ServerConfig) {
       fs.mkdirSync(tmpDir, { recursive: true });
       const writeStream = fs.createWriteStream(tmpFile);
       let size = 0;
+      let finished = false;
       await new Promise<void>((resolve, reject) => {
         req.on("data", (chunk: Buffer) => {
+          if (finished) return;
           size += chunk.length;
-          if (size > MAX_SIZE) { writeStream.destroy(); reject(new Error("File too large (max 1GB)")); return; }
+          if (size > MAX_SIZE) {
+            finished = true;
+            writeStream.destroy();
+            req.destroy();
+            reject(new Error("File too large (max 1GB)"));
+            return;
+          }
           writeStream.write(chunk);
         });
-        req.on("end", () => { writeStream.end(); });
-        req.on("error", (err) => { writeStream.destroy(); reject(err); });
-        writeStream.on("finish", () => resolve());
-        writeStream.on("error", reject);
+        req.on("end", () => { if (!finished) { finished = true; writeStream.end(); } });
+        req.on("error", (err) => { if (!finished) { finished = true; writeStream.destroy(); reject(err); } });
+        writeStream.on("finish", () => { if (!finished) { finished = true; resolve(); } });
+        writeStream.on("error", (err) => { if (!finished) { finished = true; reject(err); } });
       });
       if (size === 0) throw new Error("Empty file");
 
