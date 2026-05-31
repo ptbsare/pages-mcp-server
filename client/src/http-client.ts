@@ -97,7 +97,7 @@ export class PagesMcpHttpClient {
     });
     if (!resp.ok) throw new Error(`Upload failed: ${await resp.text()}`);
     const data: any = await resp.json();
-    return `✅ Folder deployed!\n\nURL: ${data.url}\nID: ${data.id}\nShare ID: ${data.shareId}\nFiles: ${data.fileCount}`;
+    return `✅ Folder deployed!\n\nURL: ${data.url}\nID: ${data.id}\nShare ID: ${data.shareId}\nFiles: ${data.fileCount}\nSize: ${data.totalSize} bytes`;
   }
 
   async listPages(limit?: number, offset?: number): Promise<string> {

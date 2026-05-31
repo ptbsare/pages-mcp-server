@@ -71,7 +71,8 @@ export class FileStorage {
         }
         const files = this.listFiles(dir);
         const hasIndex = files.some((f) => f === "index.html");
-        return { fileCount: files.length, hasIndex };
+        const totalSize = files.reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
+        return { fileCount: files.length, totalSize, hasIndex };
     }
     /** Blocked sensitive directory prefixes (SSRF prevention) */
     static BLOCKED_PATHS = [
@@ -124,7 +125,8 @@ export class FileStorage {
         }
         const files = this.listFiles(dir);
         const hasIndex = files.some((f) => f === "index.html");
-        return { fileCount: files.length, hasIndex };
+        const totalSize = files.reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
+        return { fileCount: files.length, totalSize, hasIndex };
     }
     /** Read a file from a page's directory, returns null if not found */
     readFile(shareId, filePath) {

@@ -137,7 +137,7 @@ export function createApp(config: ServerConfig) {
   // Stricter limit for admin endpoints: 30 requests per 15 minutes
   const adminLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 30,
+    max: 100,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many admin requests, please try again later" },
@@ -605,9 +605,9 @@ export function createApp(config: ServerConfig) {
       const id = nanoid();
       const now = new Date().toISOString();
       const result = storage.storeZip(shareId, zipBase64);
-      db.createPage({ id, shareId, name: name || `Page ${shareId}`, description, fileCount: result.fileCount, createdAt: now, updatedAt: now });
+      db.createPage({ id, shareId, name: name || `Page ${shareId}`, description, fileCount: result.fileCount, totalSize: result.totalSize, type: "folder", createdAt: now, updatedAt: now });
       const url = `${buildUrl(config.domain, config.outPort)}/s/${shareId}`;
-      res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, createdAt: now });
+      res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, fileCount: result.fileCount, totalSize: result.totalSize, createdAt: now });
       const expireDays2 = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
       if (expireDays2 > 0) setImmediate(() => storage.cleanupExpired(expireDays2, db));
     } catch (err: any) {

@@ -8,6 +8,7 @@ export declare class FileStorage {
     /** Extract a base64-encoded zip archive into the page directory (Zip Slip safe) */
     storeZip(shareId: string, zipBase64: string): {
         fileCount: number;
+        totalSize: number;
         hasIndex: boolean;
     };
     /** Blocked sensitive directory prefixes (SSRF prevention) */
@@ -23,6 +24,7 @@ export declare class FileStorage {
     /** Copy a local folder's contents into the page directory */
     storeFolder(shareId: string, folderPath: string): {
         fileCount: number;
+        totalSize: number;
         hasIndex: boolean;
     };
     /** Read a file from a page's directory, returns null if not found */

@@ -32,7 +32,7 @@ export class FileStorage {
   }
 
   /** Extract a base64-encoded zip archive into the page directory (Zip Slip safe) */
-  storeZip(shareId: string, zipBase64: string): { fileCount: number; hasIndex: boolean } {
+  storeZip(shareId: string, zipBase64: string): { fileCount: number; totalSize: number; hasIndex: boolean } {
     const dir = this.getPageDir(shareId);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -82,8 +82,9 @@ export class FileStorage {
 
     const files = this.listFiles(dir);
     const hasIndex = files.some((f) => f === "index.html");
+    const totalSize = files.reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
 
-    return { fileCount: files.length, hasIndex };
+    return { fileCount: files.length, totalSize, hasIndex };
   }
 
   /** Blocked sensitive directory prefixes (SSRF prevention) */
@@ -111,7 +112,7 @@ export class FileStorage {
   }
 
   /** Copy a local folder's contents into the page directory */
-  storeFolder(shareId: string, folderPath: string): { fileCount: number; hasIndex: boolean } {
+  storeFolder(shareId: string, folderPath: string): { fileCount: number; totalSize: number; hasIndex: boolean } {
     const dir = this.getPageDir(shareId);
     // Remove existing content if any
     if (fs.existsSync(dir)) {
@@ -140,8 +141,9 @@ export class FileStorage {
 
     const files = this.listFiles(dir);
     const hasIndex = files.some((f) => f === "index.html");
+    const totalSize = files.reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
 
-    return { fileCount: files.length, hasIndex };
+    return { fileCount: files.length, totalSize, hasIndex };
   }
 
   /** Read a file from a page's directory, returns null if not found */
