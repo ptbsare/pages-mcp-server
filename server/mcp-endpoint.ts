@@ -5,6 +5,22 @@ import type { ServerConfig } from "../shared/types.js";
 import { buildUrl } from "../shared/types.js";
 import { nanoid } from "nanoid";
 
+/** Trigger cleanup of expired shares/pages (non-blocking) */
+function triggerCleanup(storage: FileStorage) {
+  const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
+  if (expireDays <= 0) return;
+  // Fire and forget — don't block the response
+  setImmediate(() => {
+    try {
+      const result = storage.cleanupExpired(expireDays);
+      const total = result.sharesDeleted + result.pagesDeleted;
+      if (total > 0) console.log(`🧹 Cleaned up ${total} expired items (${result.sharesDeleted} shares, ${result.pagesDeleted} pages)`);
+    } catch (err) {
+      console.error('Cleanup error:', err);
+    }
+  });
+}
+
 /**
  * Handle MCP JSON-RPC requests over HTTP at /mcp
  * This implements the Streamable HTTP transport pattern.
@@ -189,6 +205,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
               ],
             },
           });
+          triggerCleanup(storage);
           return;
         }
 
@@ -280,6 +297,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
               ],
             },
           });
+          triggerCleanup(storage);
           return;
         }
 
@@ -300,14 +318,17 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
             if (stat.isFile()) {
               // Single file share
               const result = storage.deployFile(filePath, shareName);
-              const url = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}`;
+              const url = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}/${encodeURIComponent(result.fileName)}`;
               res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `✅ File shared successfully!\n\nURL: ${url}\nFile: ${result.fileName}\nSize: ${result.fileSize} bytes` }] } });
+              triggerCleanup(storage);
             } else if (stat.isDirectory()) {
               // Folder share (zip)
               const result = storage.deployFolderAsZip(filePath, shareName);
-              const url = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}`;
+              const safeName = encodeURIComponent(result.zipName);
+              const url = `${buildUrl(config.domain, config.outPort)}/f/${result.shareId}/${safeName}`;
               res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `✅ Folder shared successfully!\n\nURL: ${url}\nFiles: ${result.fileCount}\nZip size: ${result.zipSize} bytes` }] } });
             } else {
+              triggerCleanup(storage);
               res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "Error: Path is neither a file nor a directory" }], isError: true } });
             }
           } catch (err: any) {

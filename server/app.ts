@@ -241,22 +241,24 @@ export function createApp(config: ServerConfig) {
   let shareHtmlTemplate = "";
   try { shareHtmlTemplate = fs.readFileSync(shareHtmlPath, "utf-8"); } catch { console.error("share.html not found"); }
 
-  app.get("/f/:shareId", async (req: Request, res: Response) => {
+  // File share page: /f/:shareId or /f/:shareId/filename
+  app.get("/f/:shareId/:fileName?", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
     const meta = storage.getShareMeta(shareId);
     if (!meta) { res.status(404).send("Not found"); return; }
     const pageDir = path.join(config.storagePath, shareId);
     const publicUrl = buildUrl(config.domain, config.outPort);
+    const downloadName = meta.fileName || meta.zipName || "download";
+    const downloadUrl = `/f/${shareId}/raw/${encodeURIComponent(downloadName)}`;
     let content = "";
     if (meta.type === "file") {
-      // Single file: show preview + download
       const filePath = path.join(pageDir, meta.fileName);
       const ext = path.extname(meta.fileName).toLowerCase();
       const isImage = [".jpg",".jpeg",".png",".gif",".webp",".svg",".bmp",".ico"].includes(ext);
       const isText = [".txt",".md",".json",".js",".ts",".css",".html",".xml",".yaml",".yml",".log",".csv",".sh",".py",".java",".c",".cpp",".h",".go",".rs"].includes(ext);
       if (isImage) {
-        content = `<div class="preview"><img src="/f/${shareId}/raw" alt="${meta.fileName}"></div>`;
+        content = `<div class="preview"><img src="${downloadUrl}" alt="${meta.fileName}"></div>`;
       } else if (isText) {
         try {
           const textContent = fs.readFileSync(filePath, "utf-8");
@@ -266,10 +268,9 @@ export function createApp(config: ServerConfig) {
       } else {
         content = `<div class="preview"><div class="placeholder"><div class="icon">📦</div><p>${meta.fileName}</p><p style="font-size:12px;color:#64748b;margin-top:8px;">${meta.fileSize} bytes</p></div></div>`;
       }
-      content += `<div class="download-all"><a href="/f/${shareId}/raw" download="${meta.fileName}" class="btn btn-primary">⬇️ Download ${meta.fileName}</a></div>`;
+      content += `<div class="download-all"><a href="${downloadUrl}" download="${meta.fileName}" class="btn btn-primary">⬇️ Download ${meta.fileName}</a></div>`;
     } else if (meta.type === "folder") {
-      // Folder: show file list from zip
-      content = `<div class="card"><div class="card-header"><h2>📁 ${meta.folderName} (${meta.fileCount} files)</h2></div><div class="download-all"><a href="/f/${shareId}/raw" download="${meta.zipName}" class="btn btn-primary">⬇️ Download All as Zip (${meta.zipSize} bytes)</a></div></div>`;
+      content = `<div class="card"><div class="card-header"><h2>📁 ${meta.folderName} (${meta.fileCount} files)</h2></div><div class="download-all"><a href="${downloadUrl}" download="${meta.zipName}" class="btn btn-primary">⬇️ Download All as Zip (${meta.zipSize} bytes)</a></div></div>`;
     }
     const html = shareHtmlTemplate
       .replace(/__TITLE__/g, meta.fileName || meta.folderName || "File Share")
@@ -279,8 +280,8 @@ export function createApp(config: ServerConfig) {
     res.send(html);
   });
 
-  // File download/raw endpoint
-  app.get("/f/:shareId/raw", async (req: Request, res: Response) => {
+  // File download/raw endpoint: /f/:shareId/raw or /f/:shareId/raw/filename
+  app.get("/f/:shareId/raw/:fileName?", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
     const meta = storage.getShareMeta(shareId);
@@ -310,6 +311,9 @@ export function createApp(config: ServerConfig) {
       db.createPage({ id, shareId, name: name || `Page ${shareId}`, description, fileCount: 1, createdAt: now, updatedAt: now });
       const url = `${buildUrl(config.domain, config.outPort)}/s/${shareId}`;
       res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, createdAt: now });
+      // Trigger async cleanup of expired items
+      const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
+      if (expireDays > 0) setImmediate(() => storage.cleanupExpired(expireDays));
     } catch (err: any) {
       res.status(500).json({ error: "Deploy failed" } as ErrorResponse);
     }

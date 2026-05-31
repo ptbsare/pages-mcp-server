@@ -62,6 +62,7 @@ export declare class FileStorage {
         shareId: string;
         fileCount: number;
         zipSize: number;
+        zipName: string;
     };
     private addToZip;
     /**
@@ -80,9 +81,13 @@ export declare class FileStorage {
         meta: any;
     }>;
     /**
-     * Delete expired shares (not locked, older than expireDays).
-     * Returns number of deleted shares.
+     * Cleanup expired shares and pages.
+     * Called on each deploy operation (not on a timer).
+     * Returns { sharesDeleted, pagesDeleted }.
      */
-    cleanupExpired(expireDays: number): number;
+    cleanupExpired(expireDays: number): {
+        sharesDeleted: number;
+        pagesDeleted: number;
+    };
 }
 //# sourceMappingURL=storage.d.ts.map

@@ -73,19 +73,11 @@ export function startServer(config?: Partial<ServerConfig>) {
     })();
   }
 
-  // Auto-cleanup expired file shares (runs every hour)
+  // Cleanup is triggered on each deploy operation (deploy_html, deploy_folder, deploy_file)
+  // No timer needed — see triggerCleanup() in mcp-endpoint.ts
   const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
   if (expireDays > 0) {
-    const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
-    setInterval(() => {
-      try {
-        const deleted = storage.cleanupExpired(expireDays);
-        if (deleted > 0) console.log(`🧹 Cleaned up ${deleted} expired shares`);
-      } catch (err) {
-        console.error('Cleanup error:', err);
-      }
-    }, CLEANUP_INTERVAL);
-    console.log(`🕐 Auto-cleanup enabled: shares expire after ${expireDays} days`);
+    console.log(`🕐 Auto-cleanup enabled: shares/pages expire after ${expireDays} days (triggered on deploy)`);
   }
 
   return { server, app, db, storage };

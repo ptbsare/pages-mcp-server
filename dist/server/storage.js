@@ -317,7 +317,7 @@ export class FileStorage {
             createdAt: new Date().toISOString(),
             locked: false,
         }));
-        return { shareId, fileCount, zipSize: zipBuffer.length };
+        return { shareId, fileCount, zipSize: zipBuffer.length, zipName };
     }
     addToZip(zip, dirPath, zipPath) {
         const entries = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -380,26 +380,57 @@ export class FileStorage {
         return results;
     }
     /**
-     * Delete expired shares (not locked, older than expireDays).
-     * Returns number of deleted shares.
+     * Cleanup expired shares and pages.
+     * Called on each deploy operation (not on a timer).
+     * Returns { sharesDeleted, pagesDeleted }.
      */
     cleanupExpired(expireDays) {
         if (expireDays <= 0)
-            return 0; // 0 = no expiration
+            return { sharesDeleted: 0, pagesDeleted: 0 };
         const now = Date.now();
         const maxAge = expireDays * 24 * 60 * 60 * 1000;
-        let deleted = 0;
-        const shares = this.listShares();
-        for (const { shareId, meta } of shares) {
-            if (meta.locked)
+        let sharesDeleted = 0;
+        let pagesDeleted = 0;
+        if (!fs.existsSync(this.basePath))
+            return { sharesDeleted, pagesDeleted };
+        const entries = fs.readdirSync(this.basePath, { withFileTypes: true });
+        for (const entry of entries) {
+            if (!entry.isDirectory())
                 continue;
-            const created = new Date(meta.createdAt).getTime();
-            if (now - created > maxAge) {
-                this.deletePage(shareId);
-                deleted++;
+            const dirPath = path.join(this.basePath, entry.name);
+            // Check if it's a file share (has .meta file)
+            const metaPath = path.join(dirPath, ".meta");
+            if (fs.existsSync(metaPath)) {
+                // It's a file share
+                try {
+                    const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+                    if (meta.locked)
+                        continue;
+                    const created = new Date(meta.createdAt).getTime();
+                    if (now - created > maxAge) {
+                        this.deletePage(entry.name);
+                        sharesDeleted++;
+                    }
+                }
+                catch { /* ignore corrupt meta */ }
+            }
+            else {
+                // It's a regular page — check DB for lock status and creation time
+                // Pages without DB record are treated as unlocked
+                try {
+                    const pageDir = dirPath;
+                    // Check directory mtime as fallback for pages without DB record
+                    const dirStat = fs.statSync(pageDir);
+                    const dirAge = now - dirStat.mtimeMs;
+                    if (dirAge > maxAge) {
+                        this.deletePage(entry.name);
+                        pagesDeleted++;
+                    }
+                }
+                catch { /* ignore */ }
             }
         }
-        return deleted;
+        return { sharesDeleted, pagesDeleted };
     }
 }
 //# sourceMappingURL=storage.js.map
