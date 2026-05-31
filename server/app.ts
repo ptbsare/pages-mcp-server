@@ -76,6 +76,8 @@ function buildOtpauthUrl(secret: string, username: string, domain: string): stri
 
 export function createApp(config: ServerConfig) {
   const app = express();
+  // Trust nginx reverse proxy for correct IP detection behind proxy
+  app.set("trust proxy", 1);
   const db = new PagesDatabase(config.dbPath);
   const storage = new FileStorage(config.storagePath);
 

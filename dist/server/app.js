@@ -68,6 +68,8 @@ function buildOtpauthUrl(secret, username, domain) {
 }
 export function createApp(config) {
     const app = express();
+    // Trust nginx reverse proxy for correct IP detection behind proxy
+    app.set("trust proxy", 1);
     const db = new PagesDatabase(config.dbPath);
     const storage = new FileStorage(config.storagePath);
     // Load admin panel HTML template from external file
