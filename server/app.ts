@@ -4,6 +4,7 @@ import rateLimit from "express-rate-limit";
 import mime from "mime-types";
 import path from "path";
 import fs from "fs";
+import { tmpdir } from "os";
 import { nanoid } from "nanoid";
 import crypto from "crypto";
 import { PagesDatabase } from "./db.js";
@@ -346,7 +347,7 @@ export function createApp(config: ServerConfig) {
   // Streams to temp file to avoid loading entire file into memory
   app.post("/api/deploy/file", bearerAuth(db), async (req: Request, res: Response) => {
     const MAX_SIZE = 1024 * 1024 * 1024; // 1GB
-    const tmpDir = path.join(require("os").tmpdir(), `pages-upload-${nanoid()}`);
+    const tmpDir = path.join(tmpdir(), `pages-upload-${nanoid()}`);
     let tmpFile = "";
     try {
       // Stream to temp file with size limit
@@ -357,13 +358,15 @@ export function createApp(config: ServerConfig) {
       await new Promise<void>((resolve, reject) => {
         req.on("data", (chunk: Buffer) => {
           size += chunk.length;
-          if (size > MAX_SIZE) { reject(new Error("File too large (max 1GB)")); return; }
+          if (size > MAX_SIZE) { writeStream.destroy(); reject(new Error("File too large (max 1GB)")); return; }
           writeStream.write(chunk);
         });
-        req.on("end", () => { writeStream.end(); resolve(); });
-        req.on("error", reject);
+        req.on("end", () => { writeStream.end(); });
+        req.on("error", (err) => { writeStream.destroy(); reject(err); });
+        writeStream.on("finish", () => resolve());
         writeStream.on("error", reject);
       });
+      if (size === 0) throw new Error("Empty file");
 
       // Sanitize filename
       let fileName = String(req.query.filename || `upload-${Date.now()}`);
