@@ -127,6 +127,14 @@ export async function startStdioServer(remoteUrl, authToken) {
                 }
                 case "deploy_folder": {
                     const { path, name } = args;
+                    if (!path) {
+                        return { content: [{ type: "text", text: "Error: Missing required argument: path" }], isError: true };
+                    }
+                    const fs = await import("fs");
+                    const indexPath = path + "/index.html";
+                    if (!fs.existsSync(indexPath)) {
+                        return { content: [{ type: "text", text: "Error: Folder must contain an index.html file at the root." }], isError: true };
+                    }
                     text = await client.deployFolder(path, name);
                     break;
                 }

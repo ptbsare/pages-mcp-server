@@ -84,9 +84,9 @@ export function createApp(config) {
     }
     // ─── Body parsers ──────────────────────────────────────
     // Default: 1MB for most endpoints
-    const defaultParser = express.json({ limit: "1mb" });
+    const defaultParser = express.json({ limit: "4mb" });
     // Deploy: 100MB for zip uploads
-    const deployBodyParser = express.json({ limit: "100mb" });
+    const deployBodyParser = express.json({ limit: "1000mb" });
     // Deploy routes need larger body — register BEFORE global default
     app.use("/api/deploy", deployBodyParser);
     // Apply default parser globally (won't override /api/deploy)
