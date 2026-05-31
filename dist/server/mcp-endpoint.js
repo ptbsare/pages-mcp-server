@@ -288,6 +288,12 @@ export function createMcpHandler(config, db, storage) {
                     try {
                         const fs = await import("fs");
                         const path = await import("path");
+                        // SSRF prevention: block sensitive system directories
+                        const pathCheck = FileStorage.validateFolderPath(filePath);
+                        if (!pathCheck.valid) {
+                            res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `Error: ${pathCheck.error}` }], isError: true } });
+                            return;
+                        }
                         if (!fs.existsSync(filePath)) {
                             res.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: `Error: Path not found: ${filePath}` }], isError: true } });
                             return;

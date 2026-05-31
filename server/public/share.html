@@ -138,18 +138,20 @@
         // Directories first
         for (const entry of data.entries.filter(e => e.isDirectory)) {
           html += `<li><div class="icon dir">📁</div><div class="file-info">`;
-          html += `<div class="file-name"><a href="#" onclick="loadDir('${(currentPath ? currentPath + '/' : '') + entry.name}');return false;">${entry.name}</a></div>`;
+          const dirName = escHtml(entry.name); const dirJs = escJs(entry.name);
+          html += `<div class="file-name"><a href="#" onclick="loadDir('${(currentPath ? currentPath + '/' : '') + dirJs}');return false;">${dirName}</a></div>`;
           html += `<div class="file-size">${entry.fileCount} files · ${formatSize(entry.size)}</div></div>`;
-          html += `<div class="file-actions"><button class="btn btn-secondary btn-sm" onclick="downloadEntry('${entry.name}',true)">⬇️ Zip</button></div></li>`;
+          html += `<div class="file-actions"><button class="btn btn-secondary btn-sm" onclick="downloadEntry('${dirJs}',true)">⬇️ Zip</button></div></li>`;
         }
         // Files
         for (const entry of data.entries.filter(e => !e.isDirectory)) {
+          const fileName = escHtml(entry.name); const fileJs = escJs(entry.name);
           const icon = getFileIcon(entry.name);
-          const dlUrl = BASE_URL + '/raw' + (currentPath ? '/' + currentPath : '') + '/' + entry.name;
+          const dlUrl = BASE_URL + '/raw' + (currentPath ? '/' + currentPath : '') + '/' + encodeURIComponent(entry.name);
           html += `<li><div class="icon ${icon.cls}">${icon.emoji}</div><div class="file-info">`;
-          html += `<div class="file-name"><a href="${dlUrl}" target="_blank" rel="noopener">${entry.name}</a></div>`;
+          html += `<div class="file-name"><a href="${dlUrl}" target="_blank" rel="noopener">${fileName}</a></div>`;
           html += `<div class="file-size">${formatSize(entry.size)}</div></div>`;
-          html += `<div class="file-actions"><a href="${dlUrl}" download="${entry.name}" class="btn btn-primary btn-sm">⬇️</a></div></li>`;
+          html += `<div class="file-actions"><a href="${dlUrl}" download="${fileJs}" class="btn btn-primary btn-sm">⬇️</a></div></li>`;
         }
         html += '</ul>';
       }
@@ -157,6 +159,11 @@
 
       container.innerHTML = html;
     }
+
+    // Escape HTML entities
+    function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    // Escape for JS string literal
+    function escJs(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r'); }
 
     function downloadEntry(name, isDir) {
       const url = BASE_URL + '/raw' + (currentPath ? '/' + currentPath : '') + '/' + name + (isDir ? '?zip=1' : '');

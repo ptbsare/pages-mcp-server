@@ -236,6 +236,9 @@ export function createApp(config: ServerConfig) {
     res.sendFile(fullPath);
   });
 
+  // ─── Security helpers ──────────────────────────────────
+  const sanitizeFilename = (name: string) => name.replace(/[\r\n"\\]/g, '_').replace(/[\x00-\x1f]/g, '');
+
   // ─── File Share Routes ──────────────────────────────────
   const shareHtmlPath = path.resolve(process.cwd(), "server", "public", "share.html");
   let shareHtmlTemplate = "";
@@ -317,7 +320,7 @@ export function createApp(config: ServerConfig) {
     if (!meta) { res.status(404).send("Not found"); return; }
     if (meta.type === "file") {
       const filePath = path.join(config.storagePath, shareId, meta.fileName);
-      res.setHeader("Content-Disposition", `attachment; filename="${meta.fileName}"`);
+      res.setHeader("Content-Disposition", `attachment; filename="${sanitizeFilename(meta.fileName)}"`);
       res.sendFile(filePath);
     } else {
       // Zip the entire share directory
@@ -334,7 +337,7 @@ export function createApp(config: ServerConfig) {
         }
       };
       addDir(pageDir, "");
-      const zipName = (meta.folderName || shareId) + ".zip";
+      const zipName = sanitizeFilename((meta.folderName || shareId) + ".zip");
       res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
       res.setHeader("Content-Type", "application/zip");
       res.send(zip.toBuffer());
@@ -365,7 +368,7 @@ export function createApp(config: ServerConfig) {
       };
       if (fs.statSync(zipSource).isDirectory()) addDir(zipSource, "");
       else zip.addLocalFile(zipSource, path.basename(filePath));
-      const zipName = (filePath ? path.basename(filePath) : meta.folderName || shareId) + ".zip";
+      const zipName = sanitizeFilename((filePath ? path.basename(filePath) : meta.folderName || shareId) + ".zip");
       res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
       res.setHeader("Content-Type", "application/zip");
       res.send(zip.toBuffer());
@@ -373,7 +376,7 @@ export function createApp(config: ServerConfig) {
       const resolvedFile = path.resolve(pageDir, filePath);
       if (!resolvedFile.startsWith(pageDir + path.sep)) { res.status(403).send("Forbidden"); return; }
       if (!fs.existsSync(resolvedFile) || !fs.statSync(resolvedFile).isFile()) { res.status(404).send("File not found"); return; }
-      res.setHeader("Content-Disposition", `attachment; filename="${path.basename(filePath)}"`);
+      res.setHeader("Content-Disposition", `attachment; filename="${sanitizeFilename(path.basename(filePath))}"`);
       res.sendFile(resolvedFile);
     }
   });
@@ -389,11 +392,12 @@ export function createApp(config: ServerConfig) {
       res.redirect(302, `/f/${shareId}/raw/${encodeURIComponent(meta.fileName)}`);
       return;
     }
-    // Folder: render share page
+    // Folder: render share page (escape placeholders to prevent injection)
+    const esc = (s: string) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
     const html = shareHtmlTemplate
-      .replace(/__TITLE__/g, meta.folderName || "File Share")
-      .replace(/__META__/g, `${meta.fileCount} files · ${meta.totalSize || 0} bytes · ${meta.createdAt}`)
-      .replace(/__SHARE_ID__/g, shareId)
+      .replace(/__TITLE__/g, esc(meta.folderName || "File Share"))
+      .replace(/__META__/g, esc(`${meta.fileCount} files · ${meta.totalSize || 0} bytes · ${meta.createdAt}`))
+      .replace(/__SHARE_ID__/g, esc(shareId))
       .replace(/__CONTENT__/g, ""); // Content loaded via JS
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(html);
@@ -514,6 +518,8 @@ export function createApp(config: ServerConfig) {
       db.createPage({ id, shareId, name: name || `Page ${shareId}`, description, fileCount: result.fileCount, createdAt: now, updatedAt: now });
       const url = `${buildUrl(config.domain, config.outPort)}/s/${shareId}`;
       res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, createdAt: now });
+      const expireDays2 = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
+      if (expireDays2 > 0) setImmediate(() => storage.cleanupExpired(expireDays2));
     } catch (err: any) {
       console.error('Deploy error:', err);
       res.status(500).json({ error: "Deploy failed" } as ErrorResponse);
