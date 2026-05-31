@@ -309,7 +309,7 @@
         const lockInfo=locked?' · 🔒':'';
         return `<tr>
           <td>${typeIcon} <strong>${esc(p.name)}</strong>${p.description ? '<br><small style="color:var(--text3)">'+esc(p.description)+'</small>' : ''}<br><small style="color:var(--text3)">${typeLabel}${sizeInfo}${lockInfo}</small></td>
-          <td><a href="${url}" target="_blank">${urlPrefix}${p.shareId}</a></td>
+          <td><a href="${url}" target="_blank">${urlPrefix}/${p.shareId}</a></td>
           <td><span class="badge badge-blue">${p.fileCount||1}</span></td>
           <td>${new Date(p.createdAt).toLocaleDateString()}</td>
           <td><button class="btn btn-edit btn-sm" onclick="openEdit('${p.id}')">Edit</button> <button class="btn btn-secondary btn-sm" onclick="toggleLock('${p.id}',${locked})">${locked?'🔓':'🔒'}</button> <button class="btn btn-danger btn-sm" onclick="deletePage('${p.id}')">Del</button></td>
