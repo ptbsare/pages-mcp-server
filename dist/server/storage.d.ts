@@ -5,7 +5,7 @@ export declare class FileStorage {
     private getPageDir;
     /** Store a single HTML file as index.html for a page */
     storeHtml(shareId: string, html: string): string;
-    /** Extract a base64-encoded zip archive into the page directory */
+    /** Extract a base64-encoded zip archive into the page directory (Zip Slip safe) */
     storeZip(shareId: string, zipBase64: string): {
         fileCount: number;
         hasIndex: boolean;

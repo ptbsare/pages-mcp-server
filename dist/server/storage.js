@@ -23,7 +23,7 @@ export class FileStorage {
         fs.writeFileSync(filePath, html, "utf-8");
         return filePath;
     }
-    /** Extract a base64-encoded zip archive into the page directory */
+    /** Extract a base64-encoded zip archive into the page directory (Zip Slip safe) */
     storeZip(shareId, zipBase64) {
         const dir = this.getPageDir(shareId);
         if (!fs.existsSync(dir)) {
@@ -31,15 +31,37 @@ export class FileStorage {
         }
         const zipBuffer = Buffer.from(zipBase64, "base64");
         const zip = new AdmZip(zipBuffer);
-        // Security: check for path traversal entries
         const entries = zip.getEntries();
+        const dirResolved = path.resolve(dir);
         for (const entry of entries) {
-            const entryPath = path.join(dir, entry.entryName);
-            if (!entryPath.startsWith(dir)) {
+            // Reject absolute paths
+            if (path.isAbsolute(entry.entryName)) {
+                throw new Error(`Zip contains absolute path: ${entry.entryName}`);
+            }
+            // Reject any parent directory references
+            if (entry.entryName.includes("..")) {
                 throw new Error(`Zip contains unsafe path: ${entry.entryName}`);
             }
+            // Resolve the final path and ensure it's inside dir
+            const entryPath = path.resolve(dirResolved, entry.entryName);
+            if (!entryPath.startsWith(dirResolved + path.sep) && entryPath !== dirResolved) {
+                throw new Error(`Zip contains unsafe path: ${entry.entryName}`);
+            }
+            // Reject directory entries (we only want files)
+            if (entry.entryName.endsWith("/")) {
+                continue;
+            }
+            // Ensure parent directory exists
+            const parentDir = path.dirname(entryPath);
+            if (!fs.existsSync(parentDir)) {
+                fs.mkdirSync(parentDir, { recursive: true });
+            }
+            // Extract file content manually (no extractAllTo)
+            const content = entry.getData();
+            if (content) {
+                fs.writeFileSync(entryPath, content);
+            }
         }
-        zip.extractAllTo(dir, true);
         const files = this.listFiles(dir);
         const hasIndex = files.some((f) => f === "index.html");
         return { fileCount: files.length, hasIndex };
@@ -72,12 +94,21 @@ export class FileStorage {
     }
     /** Read a file from a page's directory, returns null if not found */
     readFile(shareId, filePath) {
-        const safePath = path.normalize(filePath).replace(/^(\.\.(\/|\\|$))+/, "");
-        const fullPath = path.join(this.getPageDir(shareId), safePath);
-        if (!fullPath.startsWith(this.getPageDir(shareId))) {
+        // Reject absolute paths and parent directory references
+        if (path.isAbsolute(filePath) || filePath.includes("..")) {
+            return null;
+        }
+        const pageDir = path.resolve(this.getPageDir(shareId));
+        const fullPath = path.resolve(pageDir, filePath);
+        // Strict containment check
+        if (!fullPath.startsWith(pageDir + path.sep)) {
             return null;
         }
         if (!fs.existsSync(fullPath)) {
+            return null;
+        }
+        const stat = fs.statSync(fullPath);
+        if (!stat.isFile()) {
             return null;
         }
         return fs.readFileSync(fullPath);
