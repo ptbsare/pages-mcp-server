@@ -198,8 +198,10 @@
         for (const entry of data.entries.filter(e => !e.isDirectory)) {
           const name = escHtml(entry.name); const js = escJs(entry.name);
           const dlUrl = BASE_URL + '/raw' + (currentPath ? '/' + currentPath : '') + '/' + encodeURIComponent(entry.name);
-          const previewable = isPreviewable(entry.name);
           const isImg = isImageFile(entry.name);
+          const isText = isTextFile(entry.name);
+          // Only images and text files are previewable; PDF/Office download directly
+          const previewable = isImg || isText;
 
           html += '<li>';
           if (isImg) {
@@ -208,7 +210,7 @@
             html += `<img class="thumb" src="${thumbUrl}" alt="${name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">`;
             html += `<div class="icon img" style="display:none;">🖼️</div>`;
           } else {
-            const icon = isTextFile(entry.name) ? '📄' : isPdfFile(entry.name) ? '📕' : isOfficeFile(entry.name) ? '📊' : '📎';
+            const icon = isTextFile(entry.name) ? '📄' : '📎';
             html += `<div class="icon">${icon}</div>`;
           }
           html += `<div class="file-info">`;
@@ -264,13 +266,6 @@
             const url = URL.createObjectURL(blob);
             content.innerHTML = `<img src="${url}" alt="${escHtml(fileName)}">`;
           }
-        } else if (isPdfFile(fileName)) {
-          // PDF preview using browser built-in viewer
-          content.innerHTML = `<iframe class="pdf-viewer" src="${fileUrl}#toolbar=1&navpanes=0"></iframe>`;
-        } else if (isOfficeFile(fileName)) {
-          // Office preview using Microsoft Office Online
-          const encodedUrl = encodeURIComponent(fileUrl);
-          content.innerHTML = `<iframe class="office-viewer" src="https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}"></iframe>`;
         } else if (isTextFile(fileName)) {
           // Text/code preview
           const resp = await fetch(fileUrl);
