@@ -369,7 +369,7 @@ export function createApp(config) {
                     if (e.isDirectory())
                         addDir(sp, zipPath + e.name + "/");
                     else
-                        zip.addLocalFile(sp, zipPath + e.name);
+                        zip.addFile(zipPath + e.name, fs.readFileSync(sp));
                 }
             };
             addDir(pageDir, "");
@@ -509,13 +509,13 @@ export function createApp(config) {
                     if (e.isDirectory())
                         addDir(sp, zipPath + e.name + "/");
                     else
-                        zip.addLocalFile(sp, zipPath + e.name);
+                        zip.addFile(zipPath + e.name, fs.readFileSync(sp));
                 }
             };
             if (fs.statSync(zipSource).isDirectory())
                 addDir(zipSource, "");
             else
-                zip.addLocalFile(zipSource, path.basename(filePath));
+                zip.addFile(path.basename(filePath), fs.readFileSync(zipSource));
             const zipName = sanitizeFilename((filePath ? path.basename(filePath) : meta.folderName || shareId) + ".zip");
             res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
             res.setHeader("Content-Type", "application/zip");
@@ -639,13 +639,13 @@ export function createApp(config) {
                         if (e.isDirectory())
                             addDir(sp, zipPath + e.name + "/");
                         else
-                            zip.addLocalFile(sp, zipPath + e.name);
+                            zip.addFile(zipPath + e.name, fs.readFileSync(sp));
                     }
                 };
                 addDir(zipSource, "");
             }
             else {
-                zip.addLocalFile(zipSource, path.basename(filePath));
+                zip.addFile(path.basename(filePath), fs.readFileSync(zipSource));
             }
             const zipName = (filePath ? path.basename(filePath) : meta.folderName || shareId) + ".zip";
             res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
