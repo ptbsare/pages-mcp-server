@@ -434,54 +434,6 @@ export function createApp(config) {
             res.sendFile(resolvedFile);
         }
     });
-    // Upload file to share directory
-    app.post("/f/:shareId/upload", async (req, res) => {
-        const { shareId } = req.params;
-        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
-            res.status(400).json({ error: "Bad Request" });
-            return;
-        }
-        const meta = storage.getShareMeta(shareId);
-        if (!meta) {
-            res.status(404).json({ error: "Not found" });
-            return;
-        }
-        const pageDir = path.join(config.storagePath, shareId);
-        const fileName = String(req.query.filename || `upload-${Date.now()}`);
-        const destPath = path.join(pageDir, fileName);
-        const chunks = [];
-        req.on("data", (chunk) => chunks.push(chunk));
-        req.on("end", () => { fs.writeFileSync(destPath, Buffer.concat(chunks)); res.json({ success: true, fileName }); });
-        req.on("error", () => res.status(500).json({ error: "Upload failed" }));
-    });
-    app.post("/f/:shareId/upload/**", async (req, res) => {
-        const { shareId } = req.params;
-        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
-            res.status(400).json({ error: "Bad Request" });
-            return;
-        }
-        const meta = storage.getShareMeta(shareId);
-        if (!meta) {
-            res.status(404).json({ error: "Not found" });
-            return;
-        }
-        const subPath = req.params[0] || "";
-        const uploadDir = path.join(config.storagePath, shareId, subPath);
-        const resolvedDir = path.resolve(uploadDir);
-        const shareRoot = path.resolve(path.join(config.storagePath, shareId));
-        if (!resolvedDir.startsWith(shareRoot + path.sep) && resolvedDir !== shareRoot) {
-            res.status(403).json({ error: "Forbidden" });
-            return;
-        }
-        const fileName = String(req.query.filename || `upload-${Date.now()}`);
-        const destPath = path.join(resolvedDir, fileName);
-        if (!fs.existsSync(resolvedDir))
-            fs.mkdirSync(resolvedDir, { recursive: true });
-        const chunks = [];
-        req.on("data", (chunk) => chunks.push(chunk));
-        req.on("end", () => { fs.writeFileSync(destPath, Buffer.concat(chunks)); res.json({ success: true, fileName }); });
-        req.on("error", () => res.status(500).json({ error: "Upload failed" }));
-    });
     // Share page (must be LAST among /f/:shareId routes)
     app.get("/f/:shareId", async (req, res) => {
         const { shareId } = req.params;
@@ -612,45 +564,6 @@ export function createApp(config) {
             res.setHeader("Content-Disposition", `attachment; filename="${path.basename(filePath)}"`);
             res.sendFile(resolvedFile);
         }
-    });
-    // Upload file to share directory
-    app.post("/f/:shareId/upload/**", async (req, res) => {
-        const { shareId } = req.params;
-        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
-            res.status(400).json({ error: "Bad Request" });
-            return;
-        }
-        const meta = storage.getShareMeta(shareId);
-        if (!meta) {
-            res.status(404).json({ error: "Not found" });
-            return;
-        }
-        const subPath = req.params[0] || "";
-        const uploadDir = path.join(config.storagePath, shareId, subPath);
-        const resolvedDir = path.resolve(uploadDir);
-        const shareRoot = path.resolve(path.join(config.storagePath, shareId));
-        if (!resolvedDir.startsWith(shareRoot + path.sep) && resolvedDir !== shareRoot) {
-            res.status(403).json({ error: "Forbidden" });
-            return;
-        }
-        // Handle multipart upload
-        const contentType = req.headers["content-type"] || "";
-        if (!contentType.includes("multipart/form-data")) {
-            res.status(400).json({ error: "Expected multipart/form-data" });
-            return;
-        }
-        // Simple file upload via busboy or similar — for now, write raw body
-        const fileName = String(req.query.filename || `upload-${Date.now()}`);
-        const destPath = path.join(resolvedDir, fileName);
-        if (!fs.existsSync(resolvedDir))
-            fs.mkdirSync(resolvedDir, { recursive: true });
-        const chunks = [];
-        req.on("data", (chunk) => chunks.push(chunk));
-        req.on("end", () => {
-            fs.writeFileSync(destPath, Buffer.concat(chunks));
-            res.json({ success: true, fileName });
-        });
-        req.on("error", () => res.status(500).json({ error: "Upload failed" }));
     });
     // ─── 2. Deploy API (Bearer token) ────────────────────────
     const deployAuth = bearerAuth(db);

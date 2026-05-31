@@ -128,14 +128,7 @@
       html += `<h2>${data.entries.length} items · ${formatSize(data.totalSize)}</h2>`;
       html += '<div style="display:flex;gap:6px;">';
       html += `<button class="btn btn-primary btn-sm" onclick="downloadZip()">⬇️ Download All as Zip</button>`;
-      html += `<button class="btn btn-secondary btn-sm" onclick="document.getElementById('fileInput').click()">📤 Upload</button>`;
       html += '</div></div>';
-
-      // Upload area
-      html += `<div class="upload-area" id="dropZone">`;
-      html += `<input type="file" id="fileInput" multiple onchange="handleUpload(this.files)">`;
-      html += `<label for="fileInput">📤 Click to upload files, or drag & drop here</label>`;
-      html += `<div class="upload-status" id="uploadStatus"></div></div>`;
 
       // File list
       if (data.entries.length === 0) {
@@ -163,31 +156,6 @@
       html += '</div>';
 
       container.innerHTML = html;
-
-      // Drag & drop
-      const dropZone = document.getElementById('dropZone');
-      ['dragenter','dragover'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.add('dragover'); }));
-      ['dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
-      dropZone.addEventListener('drop', e => { e.preventDefault(); handleUpload(e.dataTransfer.files); });
-    }
-
-    async function handleUpload(files) {
-      if (!files.length) return;
-      const status = document.getElementById('uploadStatus');
-      status.textContent = 'Uploading...';
-      for (const file of files) {
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          const resp = await fetch(BASE_URL + '/upload' + (currentPath ? '/' + currentPath : ''), { method: 'POST', body: formData });
-          if (!resp.ok) throw new Error('Upload failed for ' + file.name);
-          status.textContent = `✅ ${file.name} uploaded`;
-        } catch (e) {
-          status.textContent = `❌ ${e.message}`;
-          showToast(e.message, 'error');
-        }
-      }
-      setTimeout(() => loadDir(currentPath), 500);
     }
 
     function downloadEntry(name, isDir) {
