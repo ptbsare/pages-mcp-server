@@ -261,7 +261,6 @@ export function createApp(config: ServerConfig) {
       currentPath: "",
       totalSize: meta.totalSize || 0,
       entries: entries.map(e => {
-        if (e.name === ".meta") return null;
         const p = path.join(pageDir, e.name);
         const s = fs.lstatSync(p);
         if (s.isSymbolicLink()) return null;
@@ -298,7 +297,6 @@ export function createApp(config: ServerConfig) {
       currentPath: subPath,
       totalSize: meta.totalSize || 0,
       entries: entries.map(e => {
-        if (e.name === ".meta") return null;
         const p = path.join(resolvedDir, e.name);
         const s = fs.lstatSync(p);
         if (s.isSymbolicLink()) return null;
@@ -330,7 +328,6 @@ export function createApp(config: ServerConfig) {
       const pageDir = path.join(config.storagePath, shareId);
       const addDir = (dir: string, zipPath: string) => {
         for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-          if (e.name === ".meta") continue;
           const sp = path.join(dir, e.name);
           if (fs.lstatSync(sp).isSymbolicLink()) continue;
           if (e.isDirectory()) addDir(sp, zipPath + e.name + "/");
@@ -444,7 +441,6 @@ export function createApp(config: ServerConfig) {
       if (!fs.existsSync(zipSource)) { res.status(404).send("Not found"); return; }
       const addDir = (dir: string, zipPath: string) => {
         for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-          if (e.name === ".meta") continue;
           const sp = path.join(dir, e.name);
           if (fs.lstatSync(sp).isSymbolicLink()) continue;
           if (e.isDirectory()) addDir(sp, zipPath + e.name + "/");

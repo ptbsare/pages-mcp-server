@@ -299,13 +299,6 @@ export class FileStorage {
     const fileName = path.basename(filePath);
     fs.copyFileSync(filePath, path.join(dir, fileName));
     // Store metadata
-    fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
-      type: "file",
-      fileName,
-      fileSize: stat.size,
-      createdAt: new Date().toISOString(),
-      locked: false,
-    }));
     return { shareId, fileName, fileSize: stat.size };
   }
 
@@ -321,13 +314,6 @@ export class FileStorage {
     const dir = this.getPageDir(shareId);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, fileName), buffer);
-    fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
-      type: "file",
-      fileName,
-      fileSize: buffer.length,
-      createdAt: new Date().toISOString(),
-      locked: false,
-    }));
     return { shareId, fileName, fileCount: 1, fileSize: buffer.length };
   }
 
@@ -360,15 +346,6 @@ export class FileStorage {
     // Copy folder contents preserving structure
     this.copyDir(folderPath, dir);
     const fileCount = this.listFiles(dir).length;
-    // Store metadata
-    fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
-      type: "folder",
-      folderName: path.basename(folderPath),
-      fileCount,
-      totalSize,
-      createdAt: new Date().toISOString(),
-      locked: false,
-    }));
     return { shareId, fileCount, totalSize };
   }
 
@@ -381,7 +358,6 @@ export class FileStorage {
     if (!fs.existsSync(dirPath)) return 0;
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.name === ".meta") continue;
       const p = path.join(dirPath, entry.name);
       try {
         const lstat = fs.lstatSync(p);
@@ -398,21 +374,8 @@ export class FileStorage {
 
   /** Lock or unlock a page (prevents auto-cleanup when locked). Uses database. */
   setShareLock(shareId: string, locked: boolean): boolean {
-    // Find page by shareId and update locked status in database
     const pageDir = this.getPageDir(shareId);
     if (!fs.existsSync(pageDir)) return false;
-    // We need to find the page ID from the database
-    // Since we don't have a direct shareId->id mapping in storage,
-    // we'll use the database directly via the db reference
-    // For now, update .meta file as fallback (will be migrated to DB)
-    const metaPath = path.join(pageDir, ".meta");
-    if (fs.existsSync(metaPath)) {
-      try {
-        const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-        meta.locked = locked;
-        fs.writeFileSync(metaPath, JSON.stringify(meta));
-      } catch { /* ignore */ }
-    }
     return true;
   }
 
@@ -483,25 +446,14 @@ export class FileStorage {
     const entries = fs.readdirSync(this.basePath, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      const dirPath = path.join(this.basePath, entry.name);
-      const metaPath = path.join(dirPath, ".meta");
-      if (fs.existsSync(metaPath)) {
-        // File share: check .meta for locked status
-        try {
-          const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-          if (meta.locked) continue;
-          const created = new Date(meta.createdAt).getTime();
-          if (now - created > maxAge) { this.deletePage(entry.name); sharesDeleted++; }
-        } catch { /* ignore */ }
-      } else {
-        // Regular page: check database for locked status
-        try {
-          const page = await db.getPageByShareId(entry.name);
-          if (page && page.locked) continue;
-          const created = new Date(page?.createdAt || 0).getTime();
-          if (created && now - created > maxAge) { this.deletePage(entry.name); pagesDeleted++; }
-        } catch { /* ignore */ }
-      }
+      // Check database for locked status and creation date
+      try {
+        const page = await db.getPageByShareId(entry.name);
+        if (!page) continue;
+        if (page.locked) continue;
+        const created = new Date(page.createdAt || 0).getTime();
+        if (created && now - created > maxAge) { this.deletePage(entry.name); pagesDeleted++; }
+      } catch { /* ignore */ }
     }
     return { sharesDeleted, pagesDeleted };
   }

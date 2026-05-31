@@ -277,8 +277,6 @@ export function createApp(config) {
             currentPath: "",
             totalSize: meta.totalSize || 0,
             entries: entries.map(e => {
-                if (e.name === ".meta")
-                    return null;
                 const p = path.join(pageDir, e.name);
                 const s = fs.lstatSync(p);
                 if (s.isSymbolicLink())
@@ -323,8 +321,6 @@ export function createApp(config) {
             currentPath: subPath,
             totalSize: meta.totalSize || 0,
             entries: entries.map(e => {
-                if (e.name === ".meta")
-                    return null;
                 const p = path.join(resolvedDir, e.name);
                 const s = fs.lstatSync(p);
                 if (s.isSymbolicLink())
@@ -363,8 +359,6 @@ export function createApp(config) {
             const pageDir = path.join(config.storagePath, shareId);
             const addDir = (dir, zipPath) => {
                 for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-                    if (e.name === ".meta")
-                        continue;
                     const sp = path.join(dir, e.name);
                     if (fs.lstatSync(sp).isSymbolicLink())
                         continue;
@@ -505,8 +499,6 @@ export function createApp(config) {
             }
             const addDir = (dir, zipPath) => {
                 for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-                    if (e.name === ".meta")
-                        continue;
                     const sp = path.join(dir, e.name);
                     if (fs.lstatSync(sp).isSymbolicLink())
                         continue;
