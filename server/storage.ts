@@ -435,8 +435,8 @@ export class FileStorage {
    * Get share metadata.
    */
   /** Get share metadata from database (no .meta file needed) */
-  getShareMeta(shareId: string, db: any): any {
-    const page = db.getPageByShareId(shareId);
+  async getShareMeta(shareId: string, db: any): Promise<any> {
+    const page = await db.getPageByShareId(shareId);
     if (!page) return null;
     const pageDir = this.getPageDir(shareId);
     const files = this.listFiles(pageDir);
@@ -454,13 +454,13 @@ export class FileStorage {
   /**
    * List all shares with metadata.
    */
-  listShares(db: any): Array<{ shareId: string; meta: any }> {
+  async listShares(db: any): Promise<Array<{ shareId: string; meta: any }>> {
     const results: Array<{ shareId: string; meta: any }> = [];
     if (!fs.existsSync(this.basePath)) return results;
     const entries = fs.readdirSync(this.basePath, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      const meta = this.getShareMeta(entry.name, db);
+      const meta = await this.getShareMeta(entry.name, db);
       if (meta) {
         results.push({ shareId: entry.name, meta });
       }

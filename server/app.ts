@@ -252,7 +252,7 @@ export function createApp(config: ServerConfig) {
   app.get("/f/:shareId/list", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
-    const meta = storage.getShareMeta(shareId, db);
+    const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).json({ error: "Not found" }); return; }
     const pageDir = path.join(config.storagePath, shareId);
     const entries = fs.readdirSync(pageDir, { withFileTypes: true });
@@ -280,7 +280,7 @@ export function createApp(config: ServerConfig) {
   app.get("/f/:shareId/list/**", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
-    const meta = storage.getShareMeta(shareId, db);
+    const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).json({ error: "Not found" }); return; }
     const subPath = req.params[0] || "";
     const dirPath = path.join(config.storagePath, shareId, subPath);
@@ -317,7 +317,7 @@ export function createApp(config: ServerConfig) {
   app.get("/f/:shareId/raw", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
-    const meta = storage.getShareMeta(shareId, db);
+    const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).send("Not found"); return; }
     if (meta.type === "file") {
       const filePath = path.join(config.storagePath, shareId, meta.fileName);
@@ -432,7 +432,7 @@ export function createApp(config: ServerConfig) {
   app.get("/f/:shareId/raw/**", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
-    const meta = storage.getShareMeta(shareId, db);
+    const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).send("Not found"); return; }
     const filePath = req.params[0] || "";
     const isZip = req.query.zip === "1";
@@ -470,7 +470,7 @@ export function createApp(config: ServerConfig) {
   app.get("/f/:shareId", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
-    const meta = storage.getShareMeta(shareId, db);
+    const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).send("Not found"); return; }
     if (meta.type === "file") {
       // Single file: redirect to direct download
@@ -492,7 +492,7 @@ export function createApp(config: ServerConfig) {
   app.get("/f/:shareId/list/**", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
-    const meta = storage.getShareMeta(shareId, db);
+    const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).json({ error: "Not found" }); return; }
     const subPath = req.params[0] || "";
     const dirPath = path.join(config.storagePath, shareId, subPath);
@@ -528,7 +528,7 @@ export function createApp(config: ServerConfig) {
   app.get("/f/:shareId/raw/**", async (req: Request, res: Response) => {
     const { shareId } = req.params;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
-    const meta = storage.getShareMeta(shareId, db);
+    const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).send("Not found"); return; }
     const filePath = req.params[0] || "";
     const isZip = req.query.zip === "1" || !filePath;
@@ -682,7 +682,7 @@ export function createApp(config: ServerConfig) {
   // List all file shares
   app.get("/api/admin/shares", adminAuth, csrfProtection, adminLimiter, async (req: Request, res: Response) => {
     try {
-      const shares = storage.listShares(db);
+      const shares = await storage.listShares(db);
       res.json({ shares, total: shares.length });
     } catch (err: any) {
       res.status(500).json({ error: "Internal server error" });
@@ -704,7 +704,7 @@ export function createApp(config: ServerConfig) {
   // Delete a share
   app.delete("/api/admin/shares/:shareId", adminAuth, csrfProtection, adminLimiter, async (req: Request, res: Response) => {
     try {
-      const meta = storage.getShareMeta(req.params.shareId, db);
+      const meta = await storage.getShareMeta(req.params.shareId, db);
       if (!meta) { res.status(404).json({ error: "Share not found" }); return; }
       storage.deletePage(req.params.shareId);
       res.json({ success: true });

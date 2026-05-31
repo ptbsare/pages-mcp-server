@@ -265,7 +265,7 @@ export function createApp(config) {
             res.status(400).json({ error: "Bad Request" });
             return;
         }
-        const meta = storage.getShareMeta(shareId, db);
+        const meta = await storage.getShareMeta(shareId, db);
         if (!meta) {
             res.status(404).json({ error: "Not found" });
             return;
@@ -300,7 +300,7 @@ export function createApp(config) {
             res.status(400).json({ error: "Bad Request" });
             return;
         }
-        const meta = storage.getShareMeta(shareId, db);
+        const meta = await storage.getShareMeta(shareId, db);
         if (!meta) {
             res.status(404).json({ error: "Not found" });
             return;
@@ -346,7 +346,7 @@ export function createApp(config) {
             res.status(400).send("Bad Request");
             return;
         }
-        const meta = storage.getShareMeta(shareId, db);
+        const meta = await storage.getShareMeta(shareId, db);
         if (!meta) {
             res.status(404).send("Not found");
             return;
@@ -487,7 +487,7 @@ export function createApp(config) {
             res.status(400).send("Bad Request");
             return;
         }
-        const meta = storage.getShareMeta(shareId, db);
+        const meta = await storage.getShareMeta(shareId, db);
         if (!meta) {
             res.status(404).send("Not found");
             return;
@@ -546,7 +546,7 @@ export function createApp(config) {
             res.status(400).send("Bad Request");
             return;
         }
-        const meta = storage.getShareMeta(shareId, db);
+        const meta = await storage.getShareMeta(shareId, db);
         if (!meta) {
             res.status(404).send("Not found");
             return;
@@ -573,7 +573,7 @@ export function createApp(config) {
             res.status(400).json({ error: "Bad Request" });
             return;
         }
-        const meta = storage.getShareMeta(shareId, db);
+        const meta = await storage.getShareMeta(shareId, db);
         if (!meta) {
             res.status(404).json({ error: "Not found" });
             return;
@@ -617,7 +617,7 @@ export function createApp(config) {
             res.status(400).send("Bad Request");
             return;
         }
-        const meta = storage.getShareMeta(shareId, db);
+        const meta = await storage.getShareMeta(shareId, db);
         if (!meta) {
             res.status(404).send("Not found");
             return;
@@ -790,7 +790,7 @@ export function createApp(config) {
     // List all file shares
     app.get("/api/admin/shares", adminAuth, csrfProtection, adminLimiter, async (req, res) => {
         try {
-            const shares = storage.listShares(db);
+            const shares = await storage.listShares(db);
             res.json({ shares, total: shares.length });
         }
         catch (err) {
@@ -815,7 +815,7 @@ export function createApp(config) {
     // Delete a share
     app.delete("/api/admin/shares/:shareId", adminAuth, csrfProtection, adminLimiter, async (req, res) => {
         try {
-            const meta = storage.getShareMeta(req.params.shareId, db);
+            const meta = await storage.getShareMeta(req.params.shareId, db);
             if (!meta) {
                 res.status(404).json({ error: "Share not found" });
                 return;

@@ -89,14 +89,14 @@ export declare class FileStorage {
      * Get share metadata.
      */
     /** Get share metadata from database (no .meta file needed) */
-    getShareMeta(shareId: string, db: any): any;
+    getShareMeta(shareId: string, db: any): Promise<any>;
     /**
      * List all shares with metadata.
      */
-    listShares(db: any): Array<{
+    listShares(db: any): Promise<Array<{
         shareId: string;
         meta: any;
-    }>;
+    }>>;
     /**
      * Cleanup expired shares and pages.
      * Called on each deploy operation (not on a timer).

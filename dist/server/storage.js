@@ -410,8 +410,8 @@ export class FileStorage {
      * Get share metadata.
      */
     /** Get share metadata from database (no .meta file needed) */
-    getShareMeta(shareId, db) {
-        const page = db.getPageByShareId(shareId);
+    async getShareMeta(shareId, db) {
+        const page = await db.getPageByShareId(shareId);
         if (!page)
             return null;
         const pageDir = this.getPageDir(shareId);
@@ -429,7 +429,7 @@ export class FileStorage {
     /**
      * List all shares with metadata.
      */
-    listShares(db) {
+    async listShares(db) {
         const results = [];
         if (!fs.existsSync(this.basePath))
             return results;
@@ -437,7 +437,7 @@ export class FileStorage {
         for (const entry of entries) {
             if (!entry.isDirectory())
                 continue;
-            const meta = this.getShareMeta(entry.name, db);
+            const meta = await this.getShareMeta(entry.name, db);
             if (meta) {
                 results.push({ shareId: entry.name, meta });
             }
