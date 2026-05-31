@@ -64,6 +64,8 @@ export declare class FileStorage {
         fileCount: number;
         fileSize: number;
     };
+    /** Get total size of a directory (public wrapper for internal use) */
+    getDirSize(dirPath: string): number;
     /**
      * Deploy a folder for sharing (preserves directory structure).
      * Returns the share ID.
@@ -76,8 +78,8 @@ export declare class FileStorage {
     /**
      * Get total size of a directory.
      */
-    /** Calculate total size of a directory (public for app.ts use) */
-    calculateDirSize(dirPath: string): number;
+    /** Calculate total size of a directory */
+    private calculateDirSize;
     private addToZip;
     /**
      * Get share metadata.

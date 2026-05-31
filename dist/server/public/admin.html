@@ -420,27 +420,16 @@
       if (data.qrDataUrl) {
         document.getElementById('otpQrImg').src = data.qrDataUrl;
       }
-      if (data.encSecret) {
-        try {
-          // Decrypt token is in httpOnly cookie, sent automatically
-          const resp = await fetch('/api/admin/otp/decrypt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-            body: JSON.stringify({ encSecret: data.encSecret })
-          });
-          const decData = await resp.json();
-          if (decData.secret) {
-            const content = document.getElementById('otpContent');
-            content.innerHTML += `<p style="margin-top:8px;font-size:12px;color:var(--text3);">Can't scan? Secret: <code>${decData.secret}</code></p>`;
-          }
-        } catch(e) { console.error('Decrypt failed:', e); }
+      if (data.secret) {
+        const content = document.getElementById('otpContent');
+        content.innerHTML += `<p style="margin-top:8px;font-size:12px;color:var(--text3);">Can't scan? Secret: <code>${esc(data.secret)}</code></p>`;
       }
     }
 
     async function verifyOtp() {
       const code = document.getElementById('otpVerifyCode').value.trim();
       if (!code || code.length !== 6) { showToast('Enter a 6-digit code', 'error'); return; }
-      const res = await fetch('/api/admin/otp/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+      const res = await fetch('/api/admin/otp/verify', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }, body: JSON.stringify({ code }) });
       const data = await res.json();
       if (data.success) {
         showToast('2FA enabled!', 'success');

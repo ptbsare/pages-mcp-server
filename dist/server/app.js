@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import express from "express";
 import rateLimit from "express-rate-limit";
 import mime from "mime-types";
@@ -378,13 +379,17 @@ export function createApp(config) {
         }
     });
     // ─── File Upload API (for local stdio client) ──────────
-    // Use streaming to avoid loading entire file into memory
+    // Streams to temp file to avoid loading entire file into memory
     app.post("/api/deploy/file", bearerAuth(db), async (req, res) => {
         const MAX_SIZE = 1024 * 1024 * 1024; // 1GB
-        let size = 0;
-        const chunks = [];
+        const tmpDir = path.join(require("os").tmpdir(), `pages-upload-${nanoid()}`);
+        let tmpFile = "";
         try {
-            // Stream the request body with size limit
+            // Stream to temp file with size limit
+            tmpFile = path.join(tmpDir, "upload");
+            fs.mkdirSync(tmpDir, { recursive: true });
+            const writeStream = fs.createWriteStream(tmpFile);
+            let size = 0;
             await new Promise((resolve, reject) => {
                 req.on("data", (chunk) => {
                     size += chunk.length;
@@ -392,12 +397,12 @@ export function createApp(config) {
                         reject(new Error("File too large (max 1GB)"));
                         return;
                     }
-                    chunks.push(chunk);
+                    writeStream.write(chunk);
                 });
-                req.on("end", () => resolve());
+                req.on("end", () => { writeStream.end(); resolve(); });
                 req.on("error", reject);
+                writeStream.on("error", reject);
             });
-            const fileBuffer = Buffer.concat(chunks);
             // Sanitize filename
             let fileName = String(req.query.filename || `upload-${Date.now()}`);
             fileName = fileName.replace(/[\\/]/g, "_").replace(/[\x00-\x1f]/g, "");
@@ -407,6 +412,7 @@ export function createApp(config) {
             const name = String(req.query.name || "") || undefined;
             if (isZip) {
                 // Secure zip: check entries BEFORE extraction
+                const fileBuffer = fs.readFileSync(tmpFile);
                 const AdmZip = (await import("adm-zip")).default;
                 const zip = new AdmZip(fileBuffer);
                 const entries = zip.getEntries();
@@ -418,7 +424,7 @@ export function createApp(config) {
                 const shareId = nanoid(12);
                 const dir = path.join(config.storagePath, shareId);
                 fs.mkdirSync(dir, { recursive: true });
-                // Extract and clean symlinks in one pass
+                // Extract entries one by one (no extractAllTo)
                 for (const entry of entries) {
                     const entryPath = path.join(dir, entry.entryName);
                     const entryDir = path.dirname(entryPath);
@@ -429,7 +435,7 @@ export function createApp(config) {
                     }
                 }
                 const fileCount = storage.listFiles(dir).length;
-                const totalSize = storage.calculateDirSize(dir);
+                const totalSize = storage.getDirSize(dir);
                 fs.writeFileSync(path.join(dir, ".meta"), JSON.stringify({
                     type: "folder", folderName: name || path.basename(fileName, ".zip"),
                     fileCount, totalSize, createdAt: new Date().toISOString(), locked: false,
@@ -438,6 +444,7 @@ export function createApp(config) {
                 res.json({ success: true, shareId, url: `${publicUrl}/f/${shareId}`, fileCount, totalSize });
             }
             else {
+                const fileBuffer = fs.readFileSync(tmpFile);
                 const result = storage.deployFileFromBuffer(fileBuffer, fileName, name);
                 const publicUrl = buildUrl(config.domain, config.outPort);
                 const dlUrl = `${publicUrl}/f/${result.shareId}/raw/${encodeURIComponent(result.fileName)}`;
@@ -450,6 +457,19 @@ export function createApp(config) {
         catch (err) {
             console.error("Upload error:", err);
             res.status(500).json({ error: "Upload failed" });
+        }
+        finally {
+            // Clean up temp file
+            try {
+                if (tmpFile && fs.existsSync(tmpFile))
+                    fs.unlinkSync(tmpFile);
+            }
+            catch { /* ignore */ }
+            try {
+                if (fs.existsSync(tmpDir))
+                    fs.rmdirSync(tmpDir);
+            }
+            catch { /* ignore */ }
         }
     });
     app.get("/f/:shareId/raw/**", async (req, res) => {
@@ -756,46 +776,6 @@ export function createApp(config) {
             res.status(500).json({ error: "Internal server error" });
         }
     });
-    // ─── OTP Secret Decrypt ───────────────────────────────
-    app.post("/api/admin/otp/decrypt", adminAuth, csrfProtection, adminLimiter, async (req, res) => {
-        try {
-            const { encSecret, token } = req.body;
-            if (!encSecret || !token) {
-                res.status(400).json({ error: "Missing parameters" });
-                return;
-            }
-            const tokenStore = globalThis._otpDecryptTokens;
-            if (!tokenStore || !tokenStore.has(token)) {
-                res.status(403).json({ error: "Invalid or expired decrypt token" });
-                return;
-            }
-            const tokenData = tokenStore.get(token);
-            if (tokenData.expiry < Date.now()) {
-                tokenStore.delete(token);
-                res.status(403).json({ error: "Decrypt token expired" });
-                return;
-            }
-            const parts = encSecret.split(":");
-            if (parts.length !== 3) {
-                res.status(400).json({ error: "Invalid encrypted secret format" });
-                return;
-            }
-            const encKey = crypto.createHash("sha256").update(config.adminPassword + "-otp-enc").digest();
-            const iv = Buffer.from(parts[0], "hex");
-            const authTag = Buffer.from(parts[1], "hex");
-            const encrypted = Buffer.from(parts[2], "hex");
-            const decipher = crypto.createDecipheriv("aes-256-gcm", encKey, iv);
-            decipher.setAuthTag(authTag);
-            let decrypted = decipher.update(encrypted).toString("utf8");
-            decrypted += decipher.final("utf8");
-            tokenStore.delete(token);
-            res.json({ secret: decrypted });
-        }
-        catch (err) {
-            console.error('OTP decrypt error:', err);
-            res.status(500).json({ error: "Decryption failed" });
-        }
-    });
     // ─── File Sharing Management ───────────────────────────
     // List all file shares
     app.get("/api/admin/shares", adminAuth, csrfProtection, adminLimiter, async (req, res) => {
@@ -861,14 +841,8 @@ export function createApp(config) {
                 margin: 2,
                 color: { dark: "#1f2937", light: "#ffffff" },
             });
-            // Encrypt OTP secret before sending (defense in depth)
-            const encKey = crypto.createHash("sha256").update(config.adminPassword + "-otp-enc").digest();
-            const iv = crypto.randomBytes(12);
-            const cipher = crypto.createCipheriv("aes-256-gcm", encKey, iv);
-            let encrypted = cipher.update(secret, "utf8", "hex");
-            encrypted += cipher.final("hex");
-            const authTag = cipher.getAuthTag().toString("hex");
-            res.json({ otpauthUrl, qrDataUrl, encSecret: iv.toString("hex") + ":" + authTag + ":" + encrypted });
+            // Return OTP secret in plaintext (admin already authenticated)
+            res.json({ otpauthUrl, qrDataUrl, secret });
         }
         catch (err) {
             console.error('OTP setup error:', err);
@@ -1009,33 +983,9 @@ export function createApp(config) {
     });
     // ─── 5. Admin Dashboard (served at /) ────────────────────
     app.get("/", adminAuth, otpMiddleware, (req, res) => {
-        // Generate a short-lived OTP decrypt token
-        // This token allows the frontend to decrypt OTP secrets without exposing the admin password
-        const decryptToken = crypto.randomBytes(32).toString("hex");
-        const tokenExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
-        // Store in memory (in production, use a proper cache with TTL)
-        if (!globalThis._otpDecryptTokens)
-            globalThis._otpDecryptTokens = new Map();
-        globalThis._otpDecryptTokens.set(decryptToken, { expiry: tokenExpiry, adminUser: config.adminUsername });
-        // Clean old tokens periodically
-        if (globalThis._otpDecryptTokens.size > 1000) {
-            const now = Date.now();
-            for (const [k, v] of globalThis._otpDecryptTokens) {
-                if (v.expiry < now)
-                    globalThis._otpDecryptTokens.delete(k);
-            }
-        }
         const publicUrl = buildUrl(config.domain, config.outPort);
-        // Set decrypt token as httpOnly cookie (not accessible via JS, prevents XSS theft)
-        res.cookie('otp_decrypt', decryptToken, {
-            httpOnly: true,
-            secure: config.domain.startsWith('https'),
-            sameSite: 'strict',
-            maxAge: 5 * 60 * 1000, // 5 minutes
-            path: '/api/admin/otp',
-        });
-        // Inject only domain URL into HTML
-        let html = adminHtmlTemplate.replace('__DOMAIN_URL__', publicUrl);
+        // Inject domain URL into HTML
+        const html = adminHtmlTemplate.replace('__DOMAIN_URL__', publicUrl);
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.send(html);
     });

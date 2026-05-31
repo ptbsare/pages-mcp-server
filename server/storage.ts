@@ -329,6 +329,11 @@ export class FileStorage {
     return { shareId, fileName, fileCount: 1, fileSize: buffer.length };
   }
 
+  /** Get total size of a directory (public wrapper for internal use) */
+  getDirSize(dirPath: string): number {
+    return this.calculateDirSize(dirPath);
+  }
+
   /**
    * Deploy a folder for sharing (preserves directory structure).
    * Returns the share ID.
@@ -368,8 +373,8 @@ export class FileStorage {
   /**
    * Get total size of a directory.
    */
-  /** Calculate total size of a directory (public for app.ts use) */
-  calculateDirSize(dirPath: string): number {
+  /** Calculate total size of a directory */
+  private calculateDirSize(dirPath: string): number {
     let size = 0;
     if (!fs.existsSync(dirPath)) return 0;
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
