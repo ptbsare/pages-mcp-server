@@ -157,7 +157,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
             updatedAt: now,
           });
 
-          const url = `${buildUrl(config.domain, config.port)}/s/${shareId}`;
+          const url = `${buildUrl(config.domain, config.outPort)}/s/${shareId}`;
           res.json({
             jsonrpc: "2.0",
             id: body.id,
@@ -248,7 +248,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
             updatedAt: now,
           });
 
-          const url = `${buildUrl(config.domain, config.port)}/s/${shareId}`;
+          const url = `${buildUrl(config.domain, config.outPort)}/s/${shareId}`;
           res.json({
             jsonrpc: "2.0",
             id: body.id,
@@ -281,7 +281,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
 
           const text = result.pages
             .map((p) => {
-              const url = `${buildUrl(config.domain, config.port)}/s/${p.shareId}`;
+              const url = `${buildUrl(config.domain, config.outPort)}/s/${p.shareId}`;
               return `📄 ${p.name}\n   ID: ${p.id}\n   URL: ${url}\n   Files: ${p.fileCount}\n   Created: ${p.createdAt}`;
             })
             .join("\n\n");

@@ -8,18 +8,22 @@ import { nanoid } from "nanoid";
 import { buildUrl } from "../shared/types.js";
 function loadConfig() {
     const port = parseInt(process.env.PORT || "3000", 10);
-    const domain = process.env.DOMAIN || `http://localhost:${port}`;
+    // OUT_PORT: external port for public URLs (Docker port mapping).
+    // If not set, defaults to internal port.
+    // Examples: PORT=3000 OUT_PORT=38300, or PORT=3000 OUT_PORT=80
+    const outPort = parseInt(process.env.OUT_PORT || String(port), 10);
+    const domain = process.env.DOMAIN || `http://localhost:${outPort}`;
     const adminUsername = process.env.ADMIN_USERNAME || "admin";
     const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
     const authToken = process.env.AUTH_TOKEN || "";
     const dbPath = process.env.DB_PATH || path.join(os.homedir(), ".pages-mcp", "pages.db");
     const storagePath = process.env.STORAGE_PATH || path.join(os.homedir(), ".pages-mcp", "storage");
-    return { port, domain, adminUsername, adminPassword, authToken, dbPath, storagePath };
+    return { port, outPort, domain, adminUsername, adminPassword, authToken, dbPath, storagePath };
 }
 export function startServer(config) {
     const defaults = loadConfig();
     const fullConfig = { ...defaults, ...config };
-    const publicUrl = buildUrl(fullConfig.domain, fullConfig.port);
+    const publicUrl = buildUrl(fullConfig.domain, fullConfig.outPort);
     console.log(`\n🚀 Pages MCP Server`);
     console.log(`   URL:     ${publicUrl}`);
     console.log(`   Port:    ${fullConfig.port}`);

@@ -250,7 +250,7 @@ export function createApp(config: ServerConfig) {
       const now = new Date().toISOString();
       storage.storeHtml(shareId, value);
       db.createPage({ id, shareId, name: name || `Page ${shareId}`, description, fileCount: 1, createdAt: now, updatedAt: now });
-      const url = `${buildUrl(config.domain, config.port)}/s/${shareId}`;
+      const url = `${buildUrl(config.domain, config.outPort)}/s/${shareId}`;
       res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, createdAt: now });
     } catch (err: any) {
       res.status(500).json({ error: "Deploy failed" } as ErrorResponse);
@@ -268,7 +268,7 @@ export function createApp(config: ServerConfig) {
       const now = new Date().toISOString();
       const result = storage.storeZip(shareId, zipBase64);
       db.createPage({ id, shareId, name: name || `Page ${shareId}`, description, fileCount: result.fileCount, createdAt: now, updatedAt: now });
-      const url = `${buildUrl(config.domain, config.port)}/s/${shareId}`;
+      const url = `${buildUrl(config.domain, config.outPort)}/s/${shareId}`;
       res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, createdAt: now });
     } catch (err: any) {
       console.error('Deploy error:', err);
@@ -383,7 +383,7 @@ export function createApp(config: ServerConfig) {
       const secret = generateOtpSecret();
       await db.setOtpSecret(secret);
       await db.setOtpEnabled(false);
-      const otpauthUrl = buildOtpauthUrl(secret, config.adminUsername, buildUrl(config.domain, config.port));
+      const otpauthUrl = buildOtpauthUrl(secret, config.adminUsername, buildUrl(config.domain, config.outPort));
       const QRCode = await import("qrcode");
       const qrDataUrl = await QRCode.toDataURL(otpauthUrl, {
         width: 200,
@@ -533,7 +533,7 @@ export function createApp(config: ServerConfig) {
         if (v.expiry < now) globalThis._otpDecryptTokens.delete(k);
       }
     }
-    const publicUrl = buildUrl(config.domain, config.port);
+    const publicUrl = buildUrl(config.domain, config.outPort);
     // Set decrypt token as httpOnly cookie (not accessible via JS, prevents XSS theft)
     res.cookie('otp_decrypt', decryptToken, {
       httpOnly: true,

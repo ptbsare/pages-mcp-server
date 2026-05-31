@@ -46,9 +46,12 @@ export interface AdminCredentials {
 
 /** Server configuration */
 export interface ServerConfig {
-  /** Port to listen on */
+  /** Port to listen on (internal) */
   port: number;
-  /** Base domain, e.g. "https://mysite.com" or "https://mysite.com:38300" */
+  /** External port for public URLs (defaults to port). Set via OUT_PORT env var.
+   *  Docker port mapping: container 3000 → host 38300, set OUT_PORT=38300 */
+  outPort: number;
+  /** Base domain without port, e.g. "https://mysite.com" */
   domain: string;
   /** Admin username */
   adminUsername: string;
@@ -62,13 +65,13 @@ export interface ServerConfig {
   storagePath: string;
 }
 
-/** Build a public URL with port if non-standard */
-export function buildUrl(domain: string, port: number): string {
+/** Build a public URL with external port if non-standard */
+export function buildUrl(domain: string, outPort: number): string {
   try {
     const url = new URL(domain);
-    const isDefaultPort = (url.protocol === "https:" && port === 443) || (url.protocol === "http:" && port === 80);
+    const isDefaultPort = (url.protocol === "https:" && outPort === 443) || (url.protocol === "http:" && outPort === 80);
     if (!isDefaultPort && !url.port) {
-      url.port = String(port);
+      url.port = String(outPort);
     }
     return url.toString().replace(/\/$/, "");
   } catch {
