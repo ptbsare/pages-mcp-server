@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import mime from "mime-types";
 import path from "path";
 import fs from "fs";
@@ -69,15 +70,63 @@ export function createApp(config) {
     const storage = new FileStorage(config.storagePath);
     // ─── Global middleware ───────────────────────────────────
     app.use(express.json({ limit: "50mb" }));
+    // CORS: only allow same-origin requests (no cross-origin API access)
     app.use((req, res, next) => {
-        res.setHeader("Access-Control-Allow-Origin", "*");
+        const origin = req.headers.origin;
+        if (origin) {
+            // Allow same-origin only
+            const host = req.headers.host;
+            try {
+                const originUrl = new URL(origin);
+                if (originUrl.host === host) {
+                    res.setHeader("Access-Control-Allow-Origin", origin);
+                    res.setHeader("Vary", "Origin");
+                }
+            }
+            catch {
+                // Invalid origin, don't set CORS headers
+            }
+        }
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-OTP-Code");
         if (req.method === "OPTIONS") {
             res.sendStatus(204);
             return;
         }
         next();
+    });
+    // ─── Rate Limiting ─────────────────────────────────────
+    // General API rate limit: 100 requests per 15 minutes per IP
+    const apiLimiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 100,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Too many requests, please try again later" },
+    });
+    // Stricter limit for admin endpoints: 30 requests per 15 minutes
+    const adminLimiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 30,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Too many admin requests, please try again later" },
+    });
+    // Very strict for OTP verification: 10 attempts per 15 minutes
+    const otpLimiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 10,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Too many OTP attempts, please try again later" },
+    });
+    // Deploy limit: 20 per 15 minutes
+    const deployLimiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 20,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Too many deploy requests, please try again later" },
     });
     // ─── 1. Static page serving: /s/:shareId ─────────────────
     app.get("/s/:shareId", async (req, res) => {
@@ -104,6 +153,8 @@ export function createApp(config) {
             return;
         }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'");
+        res.setHeader("X-Content-Type-Options", "nosniff");
         res.sendFile(fullPath);
     });
     app.get("/s/:shareId/*", async (req, res) => {
@@ -149,11 +200,12 @@ export function createApp(config) {
         }
         const mimeType = mime.lookup(fullPath) || "application/octet-stream";
         res.setHeader("Content-Type", mimeType);
+        res.setHeader("X-Content-Type-Options", "nosniff");
         res.sendFile(fullPath);
     });
     // ─── 2. Deploy API (Bearer token) ────────────────────────
     const deployAuth = bearerAuth(db);
-    app.post("/api/deploy/html", deployAuth, (req, res) => {
+    app.post("/api/deploy/html", deployAuth, deployLimiter, (req, res) => {
         try {
             const { value, name, description } = req.body;
             if (!value || typeof value !== "string") {
@@ -169,10 +221,10 @@ export function createApp(config) {
             res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, createdAt: now });
         }
         catch (err) {
-            res.status(500).json({ error: "Deploy failed", message: err.message });
+            res.status(500).json({ error: "Deploy failed" });
         }
     });
-    app.post("/api/deploy/folder", deployAuth, (req, res) => {
+    app.post("/api/deploy/folder", deployAuth, deployLimiter, (req, res) => {
         try {
             const { zipBase64, name, description } = req.body;
             if (!zipBase64 || typeof zipBase64 !== "string") {
@@ -188,7 +240,8 @@ export function createApp(config) {
             res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, createdAt: now });
         }
         catch (err) {
-            res.status(500).json({ error: "Deploy failed", message: err.message });
+            console.error('Deploy error:', err);
+            res.status(500).json({ error: "Deploy failed" });
         }
     });
     // ─── 3. Admin Auth (Basic + optional OTP) ────────────────
@@ -212,26 +265,58 @@ export function createApp(config) {
         }
         next();
     };
+    // ─── CSRF Protection for Admin API ─────────────────────
+    // Session store: maps session IDs to creation timestamps
+    const csrfSessions = new Map();
+    const SESSION_TTL = 60 * 60 * 1000; // 1 hour
+    // Clean up expired sessions periodically
+    setInterval(() => {
+        const now = Date.now();
+        for (const [id, created] of csrfSessions) {
+            if (now - created > SESSION_TTL)
+                csrfSessions.delete(id);
+        }
+    }, 5 * 60 * 1000);
+    // Generate a CSRF session for the admin dashboard
+    app.get("/api/admin/csrf-token", adminAuth, adminLimiter, (req, res) => {
+        const sessionId = crypto.randomBytes(16).toString("hex");
+        csrfSessions.set(sessionId, Date.now());
+        res.json({ csrfToken: sessionId });
+    });
+    const csrfProtection = (req, res, next) => {
+        if (req.method === "GET") {
+            next();
+            return;
+        }
+        const csrfToken = req.headers["x-csrf-token"];
+        if (!csrfToken || !csrfSessions.has(csrfToken)) {
+            res.status(403).json({ error: "CSRF token required or expired" });
+            return;
+        }
+        // Rotate token after use (one-time use for state-changing ops)
+        csrfSessions.delete(csrfToken);
+        next();
+    };
     // ─── 4. Admin API ────────────────────────────────────────
     // OTP status
-    app.get("/api/admin/otp/status", adminAuth, async (req, res) => {
+    app.get("/api/admin/otp/status", adminAuth, adminLimiter, async (req, res) => {
         try {
             const enabled = await db.getOtpEnabled();
             const hasSecret = !!(await db.getOtpSecret());
             res.json({ enabled, hasSecret });
         }
         catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('Admin error:', err);
+            res.status(500).json({ error: "Internal server error" });
         }
     });
     // Generate OTP secret (returns secret + QR code as base64 data URL)
-    app.post("/api/admin/otp/setup", adminAuth, async (req, res) => {
+    app.post("/api/admin/otp/setup", adminAuth, csrfProtection, adminLimiter, async (req, res) => {
         try {
             const secret = generateOtpSecret();
             await db.setOtpSecret(secret);
             await db.setOtpEnabled(false);
             const otpauthUrl = buildOtpauthUrl(secret, config.adminUsername, buildUrl(config.domain, config.port));
-            // Generate QR code locally as base64 PNG
             const QRCode = await import("qrcode");
             const qrDataUrl = await QRCode.toDataURL(otpauthUrl, {
                 width: 200,
@@ -241,11 +326,12 @@ export function createApp(config) {
             res.json({ secret, otpauthUrl, qrDataUrl });
         }
         catch (err) {
-            res.status(500).json({ error: "Failed to setup OTP", message: err.message });
+            console.error('OTP setup error:', err);
+            res.status(500).json({ error: "Failed to setup OTP" });
         }
     });
     // Verify & enable OTP
-    app.post("/api/admin/otp/verify", adminAuth, async (req, res) => {
+    app.post("/api/admin/otp/verify", adminAuth, csrfProtection, otpLimiter, async (req, res) => {
         try {
             const { code } = req.body;
             if (!code) {
@@ -265,22 +351,24 @@ export function createApp(config) {
             res.json({ success: true, message: "OTP enabled" });
         }
         catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('OTP enable error:', err);
+            res.status(500).json({ error: "Internal server error" });
         }
     });
     // Disable OTP
-    app.post("/api/admin/otp/disable", adminAuth, otpMiddleware, async (req, res) => {
+    app.post("/api/admin/otp/disable", adminAuth, otpMiddleware, csrfProtection, adminLimiter, async (req, res) => {
         try {
             await db.setOtpEnabled(false);
             await db.setOtpSecret("");
             res.json({ success: true, message: "OTP disabled" });
         }
         catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('OTP disable error:', err);
+            res.status(500).json({ error: "Internal server error" });
         }
     });
     // List all pages
-    app.get("/api/admin/pages", adminAuth, otpMiddleware, async (req, res) => {
+    app.get("/api/admin/pages", adminAuth, otpMiddleware, adminLimiter, async (req, res) => {
         try {
             const limit = parseInt(req.query.limit) || 50;
             const offset = parseInt(req.query.offset) || 0;
@@ -288,10 +376,11 @@ export function createApp(config) {
             res.json({ pages: result.pages, total: result.total });
         }
         catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('List pages error:', err);
+            res.status(500).json({ error: "Internal server error" });
         }
     });
-    app.get("/api/admin/pages/:id", adminAuth, otpMiddleware, async (req, res) => {
+    app.get("/api/admin/pages/:id", adminAuth, otpMiddleware, adminLimiter, async (req, res) => {
         try {
             const page = await db.getPageById(req.params.id);
             if (!page) {
@@ -301,10 +390,11 @@ export function createApp(config) {
             res.json(page);
         }
         catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('Get page error:', err);
+            res.status(500).json({ error: "Internal server error" });
         }
     });
-    app.put("/api/admin/pages/:id", adminAuth, otpMiddleware, async (req, res) => {
+    app.put("/api/admin/pages/:id", adminAuth, otpMiddleware, csrfProtection, adminLimiter, async (req, res) => {
         try {
             const { name, description } = req.body;
             const updated = await db.updatePage(req.params.id, { name, description });
@@ -315,10 +405,11 @@ export function createApp(config) {
             res.json(await db.getPageById(req.params.id));
         }
         catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('Update page error:', err);
+            res.status(500).json({ error: "Internal server error" });
         }
     });
-    app.delete("/api/admin/pages/:id", adminAuth, otpMiddleware, async (req, res) => {
+    app.delete("/api/admin/pages/:id", adminAuth, otpMiddleware, csrfProtection, adminLimiter, async (req, res) => {
         try {
             const page = await db.getPageById(req.params.id);
             if (!page) {
@@ -330,19 +421,21 @@ export function createApp(config) {
             res.json({ success: true });
         }
         catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('Delete page error:', err);
+            res.status(500).json({ error: "Internal server error" });
         }
     });
     // Token Management
-    app.get("/api/admin/tokens", adminAuth, otpMiddleware, async (req, res) => {
+    app.get("/api/admin/tokens", adminAuth, otpMiddleware, adminLimiter, async (req, res) => {
         try {
             res.json({ tokens: await db.listTokens() });
         }
         catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('List tokens error:', err);
+            res.status(500).json({ error: "Internal server error" });
         }
     });
-    app.post("/api/admin/tokens", adminAuth, otpMiddleware, async (req, res) => {
+    app.post("/api/admin/tokens", adminAuth, otpMiddleware, csrfProtection, adminLimiter, async (req, res) => {
         try {
             const { name } = req.body;
             const now = new Date().toISOString();
@@ -351,10 +444,11 @@ export function createApp(config) {
             res.status(201).json(token);
         }
         catch (err) {
-            res.status(500).json({ error: "Failed to create token", message: err.message });
+            console.error('Create token error:', err);
+            res.status(500).json({ error: "Internal server error" });
         }
     });
-    app.delete("/api/admin/tokens/:id", adminAuth, otpMiddleware, async (req, res) => {
+    app.delete("/api/admin/tokens/:id", adminAuth, otpMiddleware, csrfProtection, adminLimiter, async (req, res) => {
         try {
             const deleted = await db.deleteToken(req.params.id);
             if (!deleted) {
@@ -364,7 +458,8 @@ export function createApp(config) {
             res.json({ success: true });
         }
         catch (err) {
-            res.status(500).json({ error: err.message });
+            console.error('Delete token error:', err);
+            res.status(500).json({ error: "Internal server error" });
         }
     });
     // ─── 5. Admin Dashboard (served at /) ────────────────────
@@ -651,10 +746,31 @@ function getAdminHtml(config) {
   <script>
     let pages = [], tokens = [], editingId = null, otpEnabled = false;
 
+    // CSRF token management
+    let _csrfToken = '';
+    async function refreshCsrfToken() {
+      try {
+        const r = await fetch('/api/admin/csrf-token');
+        const d = await r.json();
+        _csrfToken = d.csrfToken || '';
+      } catch { _csrfToken = ''; }
+    }
+    // Get initial CSRF token on page load
+    refreshCsrfToken();
+
     async function api(path, opts = {}) {
-      const res = await fetch(path, { headers: { 'Content-Type': 'application/json', ...opts.headers }, ...opts });
+      const headers = { 'Content-Type': 'application/json', ...opts.headers };
+      // Add CSRF token for state-changing requests
+      if (opts.method && opts.method !== 'GET' && _csrfToken) {
+        headers['X-CSRF-Token'] = _csrfToken;
+      }
+      const res = await fetch(path, { headers, ...opts });
       const data = await res.json();
       if (data.otpRequired) { openOtpModal(); return null; }
+      // Refresh CSRF token after state-changing requests
+      if (opts.method && opts.method !== 'GET') {
+        refreshCsrfToken();
+      }
       return data;
     }
 

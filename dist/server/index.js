@@ -2,6 +2,7 @@ import path from "path";
 import os from "os";
 import { createApp } from "./app.js";
 import { createMcpHandler } from "./mcp-endpoint.js";
+import rateLimit from "express-rate-limit";
 import { bearerAuth } from "./auth.js";
 import { nanoid } from "nanoid";
 import { buildUrl } from "../shared/types.js";
@@ -20,17 +21,22 @@ export function startServer(config) {
     const fullConfig = { ...defaults, ...config };
     const publicUrl = buildUrl(fullConfig.domain, fullConfig.port);
     console.log(`\n🚀 Pages MCP Server`);
-    console.log(`   Public:  ${publicUrl}`);
+    console.log(`   URL:     ${publicUrl}`);
     console.log(`   Port:    ${fullConfig.port}`);
-    console.log(`   Admin:   ${publicUrl}/`);
-    console.log(`   MCP:     ${publicUrl}/mcp`);
-    console.log(`   Deploy:  POST ${publicUrl}/api/deploy/html`);
     console.log(``);
     const { app, db, storage } = createApp(fullConfig);
     const mcpAuth = bearerAuth(db);
     const mcpHandler = createMcpHandler(fullConfig, db, storage);
+    // MCP rate limit: 60 requests per 15 minutes per IP
+    const mcpLimiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 60,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Too many MCP requests, please try again later" },
+    });
     // Mount MCP endpoint
-    app.post("/mcp", mcpAuth, mcpHandler);
+    app.post("/mcp", mcpLimiter, mcpAuth, mcpHandler);
     const server = app.listen(fullConfig.port, () => {
         console.log(`✅ Server running at http://localhost:${fullConfig.port}`);
     });

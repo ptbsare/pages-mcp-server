@@ -363,7 +363,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
       res.status(500).json({
         jsonrpc: "2.0",
         id: req.body?.id ?? null,
-        error: { code: -32000, message: "Internal server error: " + error.message },
+        error: { code: -32000, message: "Internal server error" },
       });
     }
   };
