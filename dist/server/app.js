@@ -897,10 +897,32 @@ export function createApp(config) {
             const limit = parseInt(req.query.limit) || 50;
             const offset = parseInt(req.query.offset) || 0;
             const result = await db.listPages(limit, offset);
-            res.json({ pages: result.pages, total: result.total });
+            // Add locked status from storage metadata
+            const pagesWithLock = result.pages.map(p => {
+                const meta = storage.getShareMeta(p.shareId);
+                return { ...p, locked: meta?.locked || false };
+            });
+            res.json({ pages: pagesWithLock, total: result.total });
         }
         catch (err) {
             console.error('List pages error:', err);
+            res.status(500).json({ error: "Internal server error" });
+        }
+    });
+    // Lock/unlock a page (prevents auto-cleanup)
+    app.post("/api/admin/pages/:id/lock", adminAuth, otpMiddleware, csrfProtection, adminLimiter, async (req, res) => {
+        try {
+            const { locked } = req.body;
+            const page = await db.getPageById(req.params.id);
+            if (!page) {
+                res.status(404).json({ error: "Page not found" });
+                return;
+            }
+            storage.setShareLock(page.shareId, !!locked);
+            res.json({ success: true, locked: !!locked });
+        }
+        catch (err) {
+            console.error('Lock error:', err);
             res.status(500).json({ error: "Internal server error" });
         }
     });

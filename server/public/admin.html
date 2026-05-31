@@ -300,14 +300,32 @@
       empty.style.display = 'none';
       tbody.innerHTML = pages.map(p => {
         const url = _domainUrl + '/s/' + p.shareId;
+        const locked = p.locked;
         return `<tr>
-          <td><strong>${esc(p.name)}</strong>${p.description ? '<br><small style="color:var(--text3)">'+esc(p.description)+'</small>' : ''}</td>
+          <td><strong>${esc(p.name)}</strong>${p.description ? '<br><small style="color:var(--text3)">'+esc(p.description)+'</small>' : ''}<br>${locked ? '<small style="color:var(--accent)">🔒 Locked</small>' : ''}</td>
           <td><a href="${url}" target="_blank">/s/${p.shareId}</a></td>
           <td><span class="badge badge-blue">${p.fileCount}</span></td>
           <td>${new Date(p.createdAt).toLocaleDateString()}</td>
-          <td><button class="btn btn-edit" onclick="openEdit('${p.id}')">Edit</button><button class="btn btn-danger" onclick="deletePage('${p.id}')">Delete</button></td>
+          <td>
+            <button class="btn btn-edit" onclick="openEdit('${p.id}')">Edit</button>
+            <button class="btn btn-secondary btn-sm" onclick="toggleLock('${p.id}', ${locked})">${locked ? '🔓 Unlock' : '🔒 Lock'}</button>
+            <button class="btn btn-danger" onclick="deletePage('${p.id}')">Delete</button>
+          </td>
         </tr>`;
       }).join('');
+    }
+
+    async function toggleLock(id, currentlyLocked) {
+      try {
+        const resp = await fetch(`/api/admin/pages/${id}/lock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+          body: JSON.stringify({ locked: !currentlyLocked })
+        });
+        if (!resp.ok) throw new Error('Failed');
+        showToast(currentlyLocked ? 'Page unlocked' : 'Page locked', 'success');
+        loadPages();
+      } catch (e) { showToast('Error: ' + e.message, 'error'); }
     }
 
     function renderTokenTable() {

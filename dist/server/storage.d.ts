@@ -80,15 +80,13 @@ export declare class FileStorage {
      */
     /** Calculate total size of a directory */
     private calculateDirSize;
+    /** Lock or unlock a share (prevents auto-cleanup when locked) */
+    setShareLock(shareId: string, locked: boolean): boolean;
     private addToZip;
     /**
      * Get share metadata.
      */
     getShareMeta(shareId: string): any;
-    /**
-     * Lock or unlock a share (prevents auto-cleanup).
-     */
-    setShareLock(shareId: string, locked: boolean): boolean;
     /**
      * List all shares with metadata.
      */

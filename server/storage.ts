@@ -394,6 +394,16 @@ export class FileStorage {
     return size;
   }
 
+  /** Lock or unlock a share (prevents auto-cleanup when locked) */
+  setShareLock(shareId: string, locked: boolean): boolean {
+    const meta = this.getShareMeta(shareId);
+    if (!meta) return false;
+    meta.locked = locked;
+    const metaPath = path.join(this.getPageDir(shareId), ".meta");
+    fs.writeFileSync(metaPath, JSON.stringify(meta));
+    return true;
+  }
+
   private addToZip(zip: any, dirPath: string, zipPath: string): void {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
     for (const entry of entries) {
@@ -420,18 +430,6 @@ export class FileStorage {
     } catch {
       return null;
     }
-  }
-
-  /**
-   * Lock or unlock a share (prevents auto-cleanup).
-   */
-  setShareLock(shareId: string, locked: boolean): boolean {
-    const meta = this.getShareMeta(shareId);
-    if (!meta) return false;
-    meta.locked = locked;
-    const metaPath = path.join(this.getPageDir(shareId), ".meta");
-    fs.writeFileSync(metaPath, JSON.stringify(meta));
-    return true;
   }
 
   /**

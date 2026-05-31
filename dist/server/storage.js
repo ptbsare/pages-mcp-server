@@ -367,6 +367,16 @@ export class FileStorage {
         }
         return size;
     }
+    /** Lock or unlock a share (prevents auto-cleanup when locked) */
+    setShareLock(shareId, locked) {
+        const meta = this.getShareMeta(shareId);
+        if (!meta)
+            return false;
+        meta.locked = locked;
+        const metaPath = path.join(this.getPageDir(shareId), ".meta");
+        fs.writeFileSync(metaPath, JSON.stringify(meta));
+        return true;
+    }
     addToZip(zip, dirPath, zipPath) {
         const entries = fs.readdirSync(dirPath, { withFileTypes: true });
         for (const entry of entries) {
@@ -396,18 +406,6 @@ export class FileStorage {
         catch {
             return null;
         }
-    }
-    /**
-     * Lock or unlock a share (prevents auto-cleanup).
-     */
-    setShareLock(shareId, locked) {
-        const meta = this.getShareMeta(shareId);
-        if (!meta)
-            return false;
-        meta.locked = locked;
-        const metaPath = path.join(this.getPageDir(shareId), ".meta");
-        fs.writeFileSync(metaPath, JSON.stringify(meta));
-        return true;
     }
     /**
      * List all shares with metadata.
