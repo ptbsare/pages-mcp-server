@@ -372,7 +372,7 @@ export function createApp(config) {
                         zip.addFile(zipPath + e.name, fs.readFileSync(sp));
                 }
             };
-            addDir(pageDir, "");
+            addDir(pageDir, (meta.folderName || shareId) + "/");
             const zipName = sanitizeFilename((meta.folderName || shareId) + ".zip");
             res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
             res.setHeader("Content-Type", "application/zip");
@@ -446,6 +446,9 @@ export function createApp(config) {
                     fileCount, totalSize, createdAt: new Date().toISOString(), locked: false,
                 }));
                 const publicUrl = buildUrl(config.domain, config.outPort);
+                const id = nanoid();
+                const now = new Date().toISOString();
+                db.createPage({ id, shareId, name: name || fileName.replace(/\.zip$/i, ""), type: "folder", fileCount, totalSize, createdAt: now, updatedAt: now });
                 res.json({ success: true, shareId, url: `${publicUrl}/f/${shareId}`, fileCount, totalSize });
             }
             else {
@@ -453,6 +456,9 @@ export function createApp(config) {
                 const result = storage.deployFileFromBuffer(fileBuffer, fileName, name);
                 const publicUrl = buildUrl(config.domain, config.outPort);
                 const dlUrl = `${publicUrl}/f/${result.shareId}/raw/${encodeURIComponent(result.fileName)}`;
+                const id2 = nanoid();
+                const now2 = new Date().toISOString();
+                db.createPage({ id: id2, shareId: result.shareId, name: name || fileName, type: "file", fileCount: 1, totalSize: result.fileSize, createdAt: now2, updatedAt: now2 });
                 res.json({ success: true, shareId: result.shareId, url: dlUrl, fileName: result.fileName, fileSize: result.fileSize });
             }
             const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
@@ -513,7 +519,7 @@ export function createApp(config) {
                 }
             };
             if (fs.statSync(zipSource).isDirectory())
-                addDir(zipSource, "");
+                addDir(zipSource, path.basename(filePath) + "/");
             else
                 zip.addFile(path.basename(filePath), fs.readFileSync(zipSource));
             const zipName = sanitizeFilename((filePath ? path.basename(filePath) : meta.folderName || shareId) + ".zip");
@@ -642,7 +648,8 @@ export function createApp(config) {
                             zip.addFile(zipPath + e.name, fs.readFileSync(sp));
                     }
                 };
-                addDir(zipSource, "");
+                const rootName = filePath ? path.basename(filePath) : (meta.folderName || shareId);
+                addDir(zipSource, rootName + "/");
             }
             else {
                 zip.addFile(path.basename(filePath), fs.readFileSync(zipSource));
