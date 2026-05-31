@@ -42,6 +42,10 @@ export declare class FileStorage {
     };
     /** Create a zip archive from a local folder and return base64 string */
     static folderToZipBase64(folderPath: string): Promise<string>;
+    /**
+     * Copy directory contents safely.
+     * Rejects symbolic links to prevent SSRF via symlink following.
+     */
     private copyDir;
 }
 //# sourceMappingURL=storage.d.ts.map

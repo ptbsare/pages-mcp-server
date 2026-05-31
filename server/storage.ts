@@ -61,6 +61,7 @@ export class FileStorage {
       if (entry.entryName.endsWith("/")) {
         continue;
       }
+
       // Ensure parent directory exists
       const parentDir = path.dirname(entryPath);
       if (!fs.existsSync(parentDir)) {
@@ -70,6 +71,12 @@ export class FileStorage {
       const content = entry.getData();
       if (content) {
         fs.writeFileSync(entryPath, content);
+        // Verify the written file is not a symlink (TOCTOU-safe check)
+        const fileStat = fs.lstatSync(entryPath);
+        if (fileStat.isSymbolicLink()) {
+          fs.unlinkSync(entryPath);
+          throw new Error(`Zip contains symbolic link: ${entry.entryName}`);
+        }
       }
     }
 
@@ -118,6 +125,11 @@ export class FileStorage {
       for (const entry of entries) {
         const srcPath = path.join(folderPath, entry.name);
         const destPath = path.join(dir, entry.name);
+        // SECURITY: Check for symbolic links before copying
+        const srcLstat = fs.lstatSync(srcPath);
+        if (srcLstat.isSymbolicLink()) {
+          throw new Error(`Symbolic links are not allowed: ${srcPath}`);
+        }
         if (entry.isDirectory()) {
           this.copyDir(srcPath, destPath);
         } else {
@@ -231,7 +243,16 @@ export class FileStorage {
     }
   }
 
+  /**
+   * Copy directory contents safely.
+   * Rejects symbolic links to prevent SSRF via symlink following.
+   */
   private copyDir(src: string, dest: string): void {
+    // Check if src itself is a symlink
+    const srcLstat = fs.lstatSync(src);
+    if (srcLstat.isSymbolicLink()) {
+      throw new Error(`Symbolic links are not allowed: ${src}`);
+    }
     if (!fs.existsSync(dest)) {
       fs.mkdirSync(dest, { recursive: true });
     }
@@ -239,6 +260,11 @@ export class FileStorage {
     for (const entry of entries) {
       const srcPath = path.join(src, entry.name);
       const destPath = path.join(dest, entry.name);
+      // Check for symlinks (lstatSync doesn't follow symlinks)
+      const entryLstat = fs.lstatSync(srcPath);
+      if (entryLstat.isSymbolicLink()) {
+        throw new Error(`Symbolic links are not allowed: ${srcPath}`);
+      }
       if (entry.isDirectory()) {
         this.copyDir(srcPath, destPath);
       } else {
