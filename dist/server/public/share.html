@@ -270,7 +270,9 @@
           // Text/code preview
           const resp = await fetch(fileUrl);
           const text = await resp.text();
-          const lang = isCodeFile(fileName) ? ext : 'plaintext';
+          let lang = isCodeFile(fileName) ? ext : 'plaintext';
+          // Map common extensions to Prism language names
+          if (lang === 'md') lang = 'markdown';
           let highlighted;
           try {
             if (Prism.languages[lang]) {
