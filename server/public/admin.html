@@ -300,8 +300,8 @@
       if (!pages.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
       empty.style.display = 'none';
       tbody.innerHTML = pages.map(p => {
-        const urlPrefix = (p.type === 'folder' || p.type === 'file') ? '/f/' : '/s/';
-        const url = _domainUrl + urlPrefix + p.shareId;
+        const urlPrefix = (p.type === 'folder' || p.type === 'file') ? '/f' : '/s';
+        const url = _domainUrl + urlPrefix + '/' + p.shareId;
         const locked = p.locked === true || p.locked === 1;
         const typeIcon=p.type==='folder'?'📁':p.type==='file'?'📄':'🌐';
         const typeLabel=p.type==='folder'?'Folder':p.type==='file'?'File':'Page';
