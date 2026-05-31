@@ -185,7 +185,8 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
 
           const text = result.pages
             .map((p) => {
-              const url = `${buildUrl(config.domain, config.outPort)}/s/${p.shareId}`;
+              const urlPrefix = (p.type === 'folder' || p.type === 'file') ? '/f/' : '/s/';
+              const url = `${buildUrl(config.domain, config.outPort)}${urlPrefix}/${p.shareId}`;
               const lockInfo = p.locked ? " [🔒]" : "";
               const typeIcon = p.type === "folder" ? "📁" : p.type === "file" ? "📄" : "🌐";
               const sizeInfo = p.totalSize ? ` (${p.totalSize} bytes)` : "";
