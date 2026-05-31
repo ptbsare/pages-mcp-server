@@ -449,7 +449,7 @@ export class FileStorage {
      * Called on each deploy operation (not on a timer).
      * Returns { sharesDeleted, pagesDeleted }.
      */
-    cleanupExpired(expireDays, db) {
+    async cleanupExpired(expireDays, db) {
         if (expireDays <= 0)
             return { sharesDeleted: 0, pagesDeleted: 0 };
         const now = Date.now();
@@ -481,7 +481,7 @@ export class FileStorage {
             else {
                 // Regular page: check database for locked status
                 try {
-                    const page = db.getPageByShareId(entry.name);
+                    const page = await db.getPageByShareId(entry.name);
                     if (page && page.locked)
                         continue;
                     const created = new Date(page?.createdAt || 0).getTime();

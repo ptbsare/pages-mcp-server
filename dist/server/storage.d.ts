@@ -102,9 +102,9 @@ export declare class FileStorage {
      * Called on each deploy operation (not on a timer).
      * Returns { sharesDeleted, pagesDeleted }.
      */
-    cleanupExpired(expireDays: number, db: any): {
+    cleanupExpired(expireDays: number, db: any): Promise<{
         sharesDeleted: number;
         pagesDeleted: number;
-    };
+    }>;
 }
 //# sourceMappingURL=storage.d.ts.map

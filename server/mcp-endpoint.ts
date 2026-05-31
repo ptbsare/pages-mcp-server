@@ -10,9 +10,9 @@ function triggerCleanup(storage: FileStorage, db: PagesDatabase) {
   const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
   if (expireDays <= 0) return;
   // Fire and forget — don't block the response
-  setImmediate(() => {
+  setImmediate(async () => {
     try {
-      const result = storage.cleanupExpired(expireDays, db);
+      const result = await storage.cleanupExpired(expireDays, db);
       const total = result.sharesDeleted + result.pagesDeleted;
       if (total > 0) console.log(`🧹 Cleaned up ${total} expired items (${result.sharesDeleted} shares, ${result.pagesDeleted} pages)`);
     } catch (err) {

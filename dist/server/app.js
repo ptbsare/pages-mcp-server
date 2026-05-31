@@ -831,7 +831,7 @@ export function createApp(config) {
     app.post("/api/admin/shares/cleanup", adminAuth, csrfProtection, adminLimiter, async (req, res) => {
         try {
             const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
-            const deleted = storage.cleanupExpired(expireDays, db);
+            const deleted = await storage.cleanupExpired(expireDays, db);
             res.json({ success: true, deleted, expireDays });
         }
         catch (err) {

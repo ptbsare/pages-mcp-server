@@ -144,7 +144,8 @@ export async function startStdioServer(remoteUrl: string, authToken: string): Pr
             return { content: [{ type: "text" as const, text: "Error: Missing required argument: path" }], isError: true };
           }
           const fs = await import("fs");
-          const indexPath = path + "/index.html";
+          const pathMod = await import("path");
+          const indexPath = pathMod.join(path, "index.html");
           if (!fs.existsSync(indexPath)) {
             return { content: [{ type: "text" as const, text: "Error: Folder must contain an index.html file at the root." }], isError: true };
           }
