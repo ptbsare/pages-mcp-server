@@ -313,6 +313,8 @@
           <td>${new Date(p.createdAt).toLocaleDateString()}</td>
           <td><button class="btn btn-edit btn-sm" onclick="openEdit('${p.id}')">Edit</button> <button class="btn btn-secondary btn-sm" onclick="toggleLock('${p.id}',${locked})">${locked?'🔓':'🔒'}</button> <button class="btn btn-danger btn-sm" onclick="deletePage('${p.id}')">Del</button></td>
         </tr>`;
+      }).join('');
+    }
 
     async function toggleLock(id, currentlyLocked) {
       try {
