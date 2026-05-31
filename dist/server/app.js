@@ -184,7 +184,9 @@ export function createApp(config) {
         }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         // User-uploaded pages: allow scripts/styles since content is trusted (deployed by us)
-        res.setHeader("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-src 'none'; object-src 'none'");
+        // script-src 'self' allows external JS from /s/:shareId/* (same page directory)
+        // style-src 'unsafe-inline' allows <style> tags in the HTML
+        res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-src 'none'; object-src 'none'");
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "DENY");
         res.setHeader("Referrer-Policy", "no-referrer");
@@ -234,8 +236,8 @@ export function createApp(config) {
         }
         const mimeType = mime.lookup(fullPath) || "application/octet-stream";
         res.setHeader("Content-Type", mimeType);
-        // Sub-resources: allow same-origin styles (CSS files from the deployed page)
-        res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'");
+        // Sub-resources: allow same-origin CSS/JS/images (from the deployed page)
+        res.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'");
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "DENY");
         res.sendFile(fullPath);
