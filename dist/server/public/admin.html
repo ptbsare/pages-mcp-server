@@ -318,12 +318,11 @@
 
     async function toggleLock(id, currentlyLocked) {
       try {
-        const resp = await fetch(`/api/admin/pages/${id}/lock`, {
+        const data = await api('/api/admin/pages/' + id + '/lock', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
           body: JSON.stringify({ locked: !currentlyLocked })
         });
-        if (!resp.ok) throw new Error('Failed');
+        if (!data) return;
         showToast(currentlyLocked ? 'Page unlocked' : 'Page locked', 'success');
         loadPages();
       } catch (e) { showToast('Error: ' + e.message, 'error'); }
@@ -386,7 +385,8 @@
 
     async function deletePage(id) {
       if (!confirm('Delete this page? This cannot be undone.')) return;
-      await api('/api/admin/pages/' + id, { method: 'DELETE' });
+      const data = await api('/api/admin/pages/' + id, { method: 'DELETE' });
+      if (!data) return;
       showToast('Page deleted', 'success');
       loadPages();
     }
