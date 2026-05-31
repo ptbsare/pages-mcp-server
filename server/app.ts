@@ -92,10 +92,18 @@ export function createApp(config: ServerConfig) {
   // ─── 1. Static page serving: /s/:shareId ─────────────────
   app.get("/s/:shareId", async (req: Request, res: Response) => {
     const { shareId } = req.params;
+    // Validate shareId format (alphanumeric + hyphen only)
+    if (!/^[a-zA-Z0-9_-]+$/.test(shareId)) {
+      res.status(400).send("<h1>400 - Bad Request</h1>"); return;
+    }
     const page = await db.getPageByShareId(shareId);
     if (!page) { res.status(404).send("<h1>404 - Page not found</h1>"); return; }
-    const pageDir = path.join(config.storagePath, shareId);
+    const pageDir = path.resolve(config.storagePath, shareId);
     const fullPath = path.join(pageDir, "index.html");
+    // Ensure the resolved path is within the pageDir
+    if (!path.resolve(fullPath).startsWith(pageDir + path.sep)) {
+      res.status(403).send("<h1>403 - Forbidden</h1>"); return;
+    }
     if (!fs.existsSync(fullPath)) { res.status(404).send("<h1>404 - File not found</h1>"); return; }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.sendFile(fullPath);
@@ -103,14 +111,32 @@ export function createApp(config: ServerConfig) {
 
   app.get("/s/:shareId/*", async (req: Request, res: Response) => {
     const { shareId } = req.params;
+    if (!/^[a-zA-Z0-9_-]+$/.test(shareId)) {
+      res.status(400).send("<h1>400 - Bad Request</h1>"); return;
+    }
     const page = await db.getPageByShareId(shareId);
     if (!page) { res.status(404).send("<h1>404 - Page not found</h1>"); return; }
-    const pageDir = path.join(config.storagePath, shareId);
-    const subPath = req.params[0] || "";
-    const safePath = path.normalize(subPath).replace(/^(\.\.(\/|\\|$))+/, "");
-    const fullPath = path.join(pageDir, safePath);
-    if (!fullPath.startsWith(pageDir)) { res.status(403).send("<h1>403 - Forbidden</h1>"); return; }
+    const pageDir = path.resolve(config.storagePath, shareId);
+    // Decode and sanitize the sub-path
+    let subPath = decodeURIComponent(req.params[0] || "");
+    // Reject absolute paths, null bytes
+    if (path.isAbsolute(subPath) || subPath.includes("\0")) {
+      res.status(403).send("<h1>403 - Forbidden</h1>"); return;
+    }
+    // Reject any parent directory references (defense in depth)
+    if (subPath.includes("..")) {
+      res.status(403).send("<h1>403 - Forbidden</h1>"); return;
+    }
+    // Normalize and resolve
+    const fullPath = path.resolve(pageDir, subPath);
+    // Strict containment check: resolved path must be under pageDir
+    if (!fullPath.startsWith(pageDir + path.sep) && fullPath !== pageDir) {
+      res.status(403).send("<h1>403 - Forbidden</h1>"); return;
+    }
+    // Additional safety: verify it's a file (not a directory) and exists
     if (!fs.existsSync(fullPath)) { res.status(404).send("<h1>404 - File not found</h1>"); return; }
+    const stat = fs.statSync(fullPath);
+    if (!stat.isFile()) { res.status(404).send("<h1>404 - Not a file</h1>"); return; }
     const mimeType = mime.lookup(fullPath) || "application/octet-stream";
     res.setHeader("Content-Type", mimeType);
     res.sendFile(fullPath);
