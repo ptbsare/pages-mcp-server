@@ -69,7 +69,8 @@ export function createApp(config) {
     const db = new PagesDatabase(config.dbPath);
     const storage = new FileStorage(config.storagePath);
     // ─── Global middleware ───────────────────────────────────
-    app.use(express.json({ limit: "50mb" }));
+    // Global body limit: 1MB (prevents memory exhaustion)
+    app.use(express.json({ limit: "1mb" }));
     // CORS: only allow same-origin requests (no cross-origin API access)
     app.use((req, res, next) => {
         const origin = req.headers.origin;
@@ -128,6 +129,18 @@ export function createApp(config) {
         legacyHeaders: false,
         message: { error: "Too many deploy requests, please try again later" },
     });
+    // ─── Block access to sensitive files ──────────────────
+    app.use((req, res, next) => {
+        const p = req.path;
+        // Block access to database files, hidden files, and backup files
+        if (p.endsWith(".db") || p.endsWith(".sqlite") || p.endsWith(".sqlite3") ||
+            p.includes("/.env") || p.includes("/.git/") ||
+            p.match(/\.(bak|old|tmp|swp|~)$/)) {
+            res.status(404).send("Not found");
+            return;
+        }
+        next();
+    });
     // ─── 1. Static page serving: /s/:shareId ─────────────────
     app.get("/s/:shareId", async (req, res) => {
         const { shareId } = req.params;
@@ -155,6 +168,9 @@ export function createApp(config) {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'");
         res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("X-Frame-Options", "DENY");
+        res.setHeader("Referrer-Policy", "no-referrer");
+        res.setHeader("X-XSS-Protection", "1; mode=block");
         res.sendFile(fullPath);
     });
     app.get("/s/:shareId/*", async (req, res) => {
@@ -205,7 +221,9 @@ export function createApp(config) {
     });
     // ─── 2. Deploy API (Bearer token) ────────────────────────
     const deployAuth = bearerAuth(db);
-    app.post("/api/deploy/html", deployAuth, deployLimiter, (req, res) => {
+    // Deploy endpoints allow larger body (5MB for zip uploads)
+    const deployBodyParser = express.json({ limit: "5mb" });
+    app.post("/api/deploy/html", deployAuth, deployLimiter, deployBodyParser, (req, res) => {
         try {
             const { value, name, description } = req.body;
             if (!value || typeof value !== "string") {
@@ -224,7 +242,7 @@ export function createApp(config) {
             res.status(500).json({ error: "Deploy failed" });
         }
     });
-    app.post("/api/deploy/folder", deployAuth, deployLimiter, (req, res) => {
+    app.post("/api/deploy/folder", deployAuth, deployLimiter, deployBodyParser, (req, res) => {
         try {
             const { zipBase64, name, description } = req.body;
             if (!zipBase64 || typeof zipBase64 !== "string") {
@@ -323,7 +341,7 @@ export function createApp(config) {
                 margin: 2,
                 color: { dark: "#1f2937", light: "#ffffff" },
             });
-            res.json({ secret, otpauthUrl, qrDataUrl });
+            res.json({ otpauthUrl, qrDataUrl });
         }
         catch (err) {
             console.error('OTP setup error:', err);
@@ -932,9 +950,7 @@ function getAdminHtml(config) {
       if (data.qrDataUrl) {
         document.getElementById('otpQrImg').src = data.qrDataUrl;
       }
-      // Show secret for manual entry
-      const content = document.getElementById('otpContent');
-      content.innerHTML += \`<p style="margin-top:8px;font-size:12px;color:var(--text3);">Can't scan? Enter manually: <code>\${data.secret}</code></p>\`;
+      // Note: secret is not returned by server for security
     }
 
     async function verifyOtp() {

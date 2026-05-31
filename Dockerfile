@@ -6,20 +6,21 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install ALL dependencies (including dev) so we can build
-# --ignore-scripts: skip prepare/postinstall to avoid build during install
 RUN npm ci --ignore-scripts
 
 # Copy source (including dist/ if pre-built)
 COPY . .
 
-# Build TypeScript (production deps not needed for tsc)
+# Build TypeScript
 RUN npx tsc
 
 # Remove dev dependencies to reduce image size
 RUN npm prune --production
 
-# Create data directories
-RUN mkdir -p /data/storage /data/db
+# Create data directories and non-root user
+RUN mkdir -p /data/storage /data/db && \
+    addgroup -S pages-mcp && \
+    adduser -S pages-mcp -G pages-mcp
 
 # Environment defaults
 ENV PORT=3000
@@ -36,6 +37,9 @@ EXPOSE 3000
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:${PORT}/health || exit 1
+
+# Switch to non-root user
+USER pages-mcp
 
 # Run server
 CMD ["node", "dist/server/index.js"]

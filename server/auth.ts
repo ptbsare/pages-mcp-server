@@ -1,10 +1,25 @@
 import type { Request, Response, NextFunction } from "express";
+import crypto from "crypto";
 import { PagesDatabase } from "./db.js";
+
+/**
+ * Constant-time string comparison to prevent timing attacks.
+ */
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    // Still do a comparison to avoid leaking length info
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 /**
  * Middleware: require Bearer token in Authorization header.
  * Tokens are validated against the database (multi-token support).
- * Used for MCP endpoint and deploy API.
+ * Uses constant-time comparison to prevent timing attacks.
  */
 export function bearerAuth(db: PagesDatabase) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -16,8 +31,12 @@ export function bearerAuth(db: PagesDatabase) {
     const provided = authHeader.slice(7);
     try {
       const token = await db.getTokenByValue(provided);
-      if (!token) {
-        res.status(403).json({ error: "Invalid token" });
+      // Constant-time comparison: always compare against a dummy value
+      const storedToken = token ? token.token : "";
+      const isValid = safeEqual(provided, storedToken);
+      if (!isValid || !token) {
+        // Same response whether token doesn't exist or doesn't match
+        res.status(401).json({ error: "Invalid token" });
         return;
       }
       // Update last_used_at (fire and forget)
@@ -31,7 +50,7 @@ export function bearerAuth(db: PagesDatabase) {
 
 /**
  * Middleware: require Basic auth (username:password).
- * Used for admin panel.
+ * Uses constant-time comparison to prevent timing attacks.
  */
 export function basicAuth(username: string, password: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -42,12 +61,23 @@ export function basicAuth(username: string, password: string) {
       return;
     }
 
-    const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf-8");
-    const [user, pass] = decoded.split(":");
-
-    if (user !== username || pass !== password) {
+    const decoded = Buffer.from(authHeader.slice(6), "utf-8").toString("utf-8");
+    const colonIdx = decoded.indexOf(":");
+    if (colonIdx === -1) {
       res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
-      res.status(403).json({ error: "Invalid credentials" });
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
+    }
+    const user = decoded.substring(0, colonIdx);
+    const pass = decoded.substring(colonIdx + 1);
+
+    // Constant-time comparison for both username and password
+    const userValid = safeEqual(user, username);
+    const passValid = safeEqual(pass, password);
+
+    if (!userValid || !passValid) {
+      res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
+      res.status(401).json({ error: "Invalid credentials" });
       return;
     }
 
