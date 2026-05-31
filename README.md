@@ -11,7 +11,7 @@ Self-hosted MCP server for deploying and managing static websites. Deploy HTML p
 - **Multi-token auth** — create/revoke API tokens from the admin dashboard
 - **Admin dashboard** — web UI at `/` for managing pages, tokens, and 2FA settings
 - **Two-factor authentication (2FA)** — optional TOTP-based 2FA for admin access (Google Authenticator compatible)
-- **Docker support** — multi-arch images on GHCR
+- **Docker support** — multi-arch images on GHCR, multi-stage build, non-root user
 - **npx runnable** — no install needed, run directly from GitHub
 
 ## Quick Start
@@ -19,36 +19,30 @@ Self-hosted MCP server for deploying and managing static websites. Deploy HTML p
 ### Via npx (recommended)
 
 ```bash
-# Start server (replace 38300 with your desired port)
+# Start server
 npx github:ptbsare/pages-mcp-server server \
-  --port 38300 \
+  --port 3000 \
   --domain https://mysite.com \
   --admin-user admin \
   --admin-pass secret
 ```
 
-After starting, access the **admin dashboard** at:
-```
-https://mysite.com:38300/
-```
-Log in with the admin username/password you set. From there you can:
+After starting, access the **admin dashboard** at `https://mysite.com:3000/`. Log in with the admin username/password you set. From there you can:
 - Create & manage API tokens
 - View & delete deployed pages
 - Enable 2FA (TOTP) for admin access
 
-> **Note:** If your server runs on a non-standard port (not 80/443), include the port in the URL: `https://mysite.com:38300/`. The `--domain` should be the base URL without port — the server automatically appends the port to generated share URLs.
-
 **Start stdio MCP client** (for AI assistants like Cursor, Claude Desktop):
 ```bash
 npx github:ptbsare/pages-mcp-server client \
-  --url https://mysite.com:38300 \
+  --url https://mysite.com:3000 \
   --auth-token your-api-token
 ```
 
 **Interactive CLI mode:**
 ```bash
 npx github:ptbsare/pages-mcp-server client \
-  --url https://mysite.com:38300 \
+  --url https://mysite.com:3000 \
   --interactive
 ```
 
@@ -61,9 +55,38 @@ docker run -d \
   -e DOMAIN=https://mysite.com \
   -e ADMIN_USERNAME=admin \
   -e ADMIN_PASSWORD=secret \
+  -e OUT_PORT=3000 \
   -v pages-data:/data \
   ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
 ```
+
+#### Docker Port Mapping
+
+When using Docker port mapping, the container's internal port and the external host port may differ. Use `OUT_PORT` to specify the external port that users will access:
+
+```bash
+# Container runs on 3000, exposed to host as 38300
+docker run -d \
+  --name pages-mcp \
+  -p 38300:3000 \
+  -e PORT=3000 \
+  -e OUT_PORT=38300 \
+  -e DOMAIN=https://mysite.com \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD=secret \
+  -v pages-data:/data \
+  ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
+```
+
+| Scenario | PORT | OUT_PORT | Public URL |
+|----------|------|----------|-----------|
+| Direct (no Docker) | 3000 | 3000 (default) | `http://domain:3000` |
+| Docker (same port) | 3000 | 3000 | `http://domain:3000` |
+| Docker (mapped) | 3000 | 38300 | `http://domain:38300` |
+| Standard HTTPS | 443 | 443 | `https://domain` (port omitted) |
+| Standard HTTP | 80 | 80 | `http://domain` (port omitted) |
+
+> **Note:** Standard ports (80 for HTTP, 443 for HTTPS) are automatically omitted from generated URLs.
 
 #### Docker Volume Mounts
 
@@ -110,17 +133,19 @@ services:
     image: ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
     container_name: pages-mcp
     ports:
+      # "HOST_PORT:CONTAINER_PORT"
       - "3000:3000"
     environment:
-      - DOMAIN=https://mysite.com
+      - PORT=3000
+      # OUT_PORT: external port for public URLs. Defaults to PORT if not set.
+      # For Docker port mapping, set to the HOST port. Standard ports (80/443) auto-omitted.
+      # - OUT_PORT=3000
+      - DOMAIN=http://localhost:3000
       - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=secret
-      # Optional: initial API token(s), comma-separated
-      # - AUTH_TOKEN=my-initial-token
+      - ADMIN_PASSWORD=changeme
       - DB_PATH=/data/db/pages.db
       - STORAGE_PATH=/data/storage
     volumes:
-      # Mount /data to persist database + deployed files
       - pages-data:/data
     restart: unless-stopped
 
@@ -141,7 +166,8 @@ docker compose logs -f
 ```bash
 git clone https://github.com/ptbsare/pages-mcp-server
 cd pages-mcp-server
-npm install && npm run build
+npm install
+npm run build
 node dist/server/index.js
 ```
 
@@ -189,12 +215,12 @@ API tokens can be managed at `/` dashboard or via `/api/admin/tokens` REST API.
 The admin panel supports optional two-factor authentication using TOTP (Google Authenticator, Authy, etc.).
 
 **Setup flow:**
-1. `POST /api/admin/otp/setup` — generates secret + otpauth URL
-2. Scan QR code (generated from otpauth URL) with your authenticator app
-3. `POST /api/admin/otp/verify` with a 6-digit code to enable 2FA
-4. Once enabled, all admin requests require `X-OTP-Code` header with a valid TOTP code
+1. Go to admin dashboard → click "🔐 2FA" → click "Setup 2FA"
+2. Scan the QR code with your authenticator app
+3. Enter the 6-digit code to verify and enable 2FA
+4. Once enabled, all admin requests require a valid TOTP code
 
-**Disable:** `POST /api/admin/otp/disable` (requires current OTP code)
+**Disable:** Click "🔐 2FA" → "Disable 2FA" → enter current code to confirm
 
 ### REST Endpoints
 
@@ -267,8 +293,6 @@ All tools accept optional `name` and `description` parameters.
 
 ### Cursor / Claude Desktop (stdio mode)
 
-The stdio client connects to a **remote** server and proxies MCP tools over HTTP. You can specify the remote server URL and port:
-
 ```json
 {
   "mcpServers": {
@@ -277,7 +301,7 @@ The stdio client connects to a **remote** server and proxies MCP tools over HTTP
       "args": [
         "github:ptbsare/pages-mcp-server",
         "client",
-        "--url", "https://mysite.com:38300",
+        "--url", "https://mysite.com:3000",
         "--auth-token", "your-api-token"
       ]
     }
@@ -286,36 +310,17 @@ The stdio client connects to a **remote** server and proxies MCP tools over HTTP
 ```
 
 **Key points:**
-- `--url` specifies the full remote server URL including port (e.g. `https://mysite.com:38300`)
+- `--url` specifies the full remote server URL including port
 - `--auth-token` is an API token created from the admin dashboard at `/`
 - The stdio client runs locally and communicates with the remote server via HTTP
 
-**With custom port:**
-```json
-{
-  "mcpServers": {
-    "pages-mcp": {
-      "command": "npx",
-      "args": [
-        "github:ptbsare/pages-mcp-server",
-        "client",
-        "--url", "http://192.168.1.100:38300",
-        "--auth-token", "your-api-token"
-      ]
-    }
-  }
-}
-```
-
-### Remote HTTP mode (direct, no stdio proxy)
-
-Some MCP clients support direct HTTP transport:
+### Remote HTTP mode (direct)
 
 ```json
 {
   "mcpServers": {
     "pages-mcp": {
-      "url": "https://mysite.com:38300/mcp",
+      "url": "https://mysite.com:3000/mcp",
       "headers": {
         "Authorization": "Bearer your-api-token"
       }
@@ -328,11 +333,12 @@ Some MCP clients support direct HTTP transport:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | 3000 | Server port |
-| `DOMAIN` | http://localhost:3000 | Base domain for share URLs |
+| `PORT` | 3000 | Internal server port (what the server listens on) |
+| `OUT_PORT` | Same as `PORT` | External port for public URLs. Set this when using Docker port mapping. Standard ports (80/443) are auto-omitted from URLs. |
+| `DOMAIN` | http://localhost:3000 | Base domain without port (e.g. `https://mysite.com`) |
 | `ADMIN_USERNAME` | admin | Admin dashboard username |
 | `ADMIN_PASSWORD` | admin123 | Admin dashboard password |
-| `AUTH_TOKEN` | *(none)* | Initial API token(s), comma-separated. Seeded into DB on startup. |
+| `AUTH_TOKEN` | *(none)* | Initial API token(s), comma-separated. Seeded into DB on first startup only. |
 | `DB_PATH` | ~/.pages-mcp/pages.db | SQLite database path |
 | `STORAGE_PATH` | ~/.pages-mcp/storage | File storage path |
 
@@ -346,12 +352,19 @@ Images are published to GHCR on every push:
 |-----|------|
 | `beta` | Every push to `main` |
 | `v{version}` | On tag push (e.g. `v1.2.3`) |
-| `v{major}.{minor}` | On tag push (e.g. `v1.2`) |
+| `v{major}.{minor}}` | On tag push (e.g. `v1.2`) |
 | `latest` | On tag push |
 
 ```bash
 docker pull ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
 ```
+
+### Docker Image Features
+
+- **Multi-stage build** — small final image (~100MB), build tools not included
+- **Non-root user** — container runs as `pages-mcp` user for security
+- **Health check** — built-in health check via `/health` endpoint
+- **Multi-arch** — supports `linux/amd64` and `linux/arm64`
 
 ## Systemd Service (Linux)
 
@@ -373,6 +386,24 @@ sudo journalctl -u pages-mcp-server -f
 ```
 
 The service file uses `npx github:ptbsare/pages-mcp-server` to run. Data is stored in `/root/.pages-mcp/` by default.
+
+### Security Hardening
+
+The service file includes comments for additional hardening when running as non-root:
+
+```ini
+# Create dedicated user:
+#   useradd --system --no-create-home --shell /usr/sbin/nologin pages-mcp
+
+# Then in service file:
+# User=pages-mcp
+# Group=pages-mcp
+# NoNewPrivileges=true
+# ProtectSystem=strict
+# ProtectHome=true
+# PrivateTmp=true
+# ReadWritePaths=/var/lib/pages-mcp
+```
 
 ## License
 

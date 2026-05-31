@@ -5,16 +5,30 @@ services:
     image: ghcr.io/ptbsare/pages-mcp-server/pages-mcp-server:latest
     container_name: pages-mcp
     ports:
+      # Map container port (3000) to host port (change 3000 to your desired external port)
+      # Examples:
+      #   "3000:3000"   → accessible at http://localhost:3000
+      #   "38300:3000"  → accessible at http://localhost:38300
+      #   "80:3000"     → accessible at http://localhost
       - "3000:3000"
     environment:
+      # Internal port (container listens on this)
+      - PORT=3000
+      # External port for public URLs (the port you expose to the world).
+      # If not set, defaults to PORT. For Docker port mapping, set this to the HOST port.
+      # Examples: OUT_PORT=38300, OUT_PORT=80, OUT_PORT=443
+      # Standard ports (80/443) are automatically omitted from URLs.
+      # - OUT_PORT=3000
+      # Base domain without port (e.g. "https://mysite.com")
       - DOMAIN=http://localhost:3000
       - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=admin123
-      # Optional: initial API token(s), comma-separated
-      # - AUTH_TOKEN=my-initial-token
+      - ADMIN_PASSWORD=changeme
+      # Optional: initial API token(s), comma-separated. Seeded on first startup.
+      # - AUTH_TOKEN=my-secret-token
       - DB_PATH=/data/db/pages.db
       - STORAGE_PATH=/data/storage
     volumes:
+      # Persist database + deployed files across container restarts
       - pages-data:/data
     restart: unless-stopped
 
