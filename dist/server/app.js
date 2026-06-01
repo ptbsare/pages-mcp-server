@@ -13,12 +13,22 @@ import { bearerAuth, basicAuth } from "./auth.js";
 import { buildUrl } from "../shared/types.js";
 // ─── OTP helpers ────────────────────────────────────────────
 function generateOtpSecret() {
-    // Base32 encoded 20-byte random secret
+    // Base32 encoded 160-bit (20-byte) random secret → 32 base32 chars
     const bytes = crypto.randomBytes(20);
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
     let result = "";
+    let buffer = 0, bitsLeft = 0;
     for (let i = 0; i < bytes.length; i++) {
-        result += chars[bytes[i] % 32];
+        buffer = (buffer << 8) | bytes[i];
+        bitsLeft += 8;
+        while (bitsLeft >= 5) {
+            bitsLeft -= 5;
+            result += chars[(buffer >> bitsLeft) & 0x1f];
+        }
+    }
+    // Pad remaining bits
+    if (bitsLeft > 0) {
+        result += chars[(buffer << (5 - bitsLeft)) & 0x1f];
     }
     return result;
 }
