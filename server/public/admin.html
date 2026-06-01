@@ -455,6 +455,7 @@
         showToast('2FA enabled!', 'success');
         closeModal('otpModal');
         loadOtpStatus();
+        refreshCsrfToken();
       } else {
         showToast(data.error || 'Invalid code', 'error');
       }
@@ -470,6 +471,7 @@
         showToast('2FA disabled', 'success');
         closeModal('otpModal');
         loadOtpStatus();
+        refreshCsrfToken();
       } else {
         showToast(data.error || 'Failed', 'error');
       }
