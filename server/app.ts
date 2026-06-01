@@ -489,6 +489,7 @@ export function createApp(config: ServerConfig) {
       .replace(/__SHARE_ID__/g, esc(shareId))
       .replace(/__CONTENT__/g, ""); // Content loaded via JS
     res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net; img-src 'self' blob: data:; font-src cdn.jsdelivr.net; connect-src 'self'; frame-src 'none'; object-src 'none'");
     res.send(html);
   });
 
@@ -886,6 +887,7 @@ export function createApp(config: ServerConfig) {
     // Inject domain URL into HTML
     const html = adminHtmlTemplate.replace('__DOMAIN_URL__', publicUrl);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-src 'none'; object-src 'none'");
     res.send(html);
   });
 
