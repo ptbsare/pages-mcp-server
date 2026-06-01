@@ -244,6 +244,10 @@ export function createApp(config: ServerConfig) {
     const pageDir = path.resolve(config.storagePath, shareId);
     // Decode and sanitize the sub-path
     let subPath = decodeURIComponent(req.params[0] || "");
+    // If empty (trailing slash), serve index.html
+    if (!subPath || subPath === "/") {
+      return serveStaticPage(req, res, shareId);
+    }
     // Reject absolute paths, null bytes
     if (path.isAbsolute(subPath) || subPath.includes("\0")) {
       res.status(403).send("<h1>403 - Forbidden</h1>"); return;
@@ -258,7 +262,6 @@ export function createApp(config: ServerConfig) {
     if (!fullPath.startsWith(pageDir + path.sep) && fullPath !== pageDir) {
       res.status(403).send("<h1>403 - Forbidden</h1>"); return;
     }
-    // Additional safety: verify it's a file (not a directory) and exists
     if (!fs.existsSync(fullPath)) { res.status(404).send("<h1>404 - File not found</h1>"); return; }
     const stat = fs.statSync(fullPath);
     if (!stat.isFile()) { res.status(404).send("<h1>404 - Not a file</h1>"); return; }
