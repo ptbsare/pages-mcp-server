@@ -183,13 +183,29 @@ export function createApp(config) {
         next();
     });
     // ─── 1. Static page serving: /s/:shareId ─────────────────
+    // Serve static pages: /s/:shareId and /s/:shareId/
+    // Redirect to trailing slash so relative paths (./a.png) resolve correctly
     app.get("/s/:shareId", async (req, res) => {
         const { shareId } = req.params;
-        // Validate shareId format (alphanumeric + hyphen only)
         if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
             res.status(400).send("<h1>400 - Bad Request</h1>");
             return;
         }
+        // Always redirect to trailing slash for directory-style access
+        if (!req.path.endsWith("/")) {
+            return res.redirect(301, req.path + "/");
+        }
+        return serveStaticPage(req, res, shareId);
+    });
+    app.get("/s/:shareId/", async (req, res) => {
+        const { shareId } = req.params;
+        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
+            res.status(400).send("<h1>400 - Bad Request</h1>");
+            return;
+        }
+        return serveStaticPage(req, res, shareId);
+    });
+    async function serveStaticPage(req, res, shareId) {
         const page = await db.getPageByShareId(shareId);
         if (!page) {
             res.status(404).send("<h1>404 - Page not found</h1>");
@@ -197,7 +213,6 @@ export function createApp(config) {
         }
         const pageDir = path.resolve(config.storagePath, shareId);
         const fullPath = path.join(pageDir, "index.html");
-        // Ensure the resolved path is within the pageDir
         if (!path.resolve(fullPath).startsWith(pageDir + path.sep)) {
             res.status(403).send("<h1>403 - Forbidden</h1>");
             return;
@@ -207,16 +222,13 @@ export function createApp(config) {
             return;
         }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
-        // User-uploaded pages: allow scripts/styles since content is trusted (deployed by us)
-        // script-src 'self' allows external JS from /s/:shareId/* (same page directory)
-        // style-src 'unsafe-inline' allows <style> tags in the HTML
         res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-src 'none'; object-src 'none'");
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "DENY");
         res.setHeader("Referrer-Policy", "no-referrer");
         res.setHeader("X-XSS-Protection", "1; mode=block");
         res.sendFile(fullPath);
-    });
+    }
     app.get("/s/:shareId/*", async (req, res) => {
         const { shareId } = req.params;
         if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
