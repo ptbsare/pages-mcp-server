@@ -237,7 +237,7 @@
   <script>
     let pages = [], tokens = [], editingId = null, otpEnabled = false;
     let _csrfToken = '';
-    let _otpCode = '';
+    let _otpCode = sessionStorage.getItem('otpCode') || '';
     // OTP decrypt token is in httpOnly cookie (not in HTML for security)
     const _domainUrl = '__DOMAIN_URL__';
 
@@ -272,6 +272,7 @@
       const code = document.getElementById('otpAuthCode').value.trim();
       if (!code || code.length !== 6) { showToast('Enter a 6-digit code', 'error'); return; }
       _otpCode = code;
+      sessionStorage.setItem('otpCode', code);
       closeModal('otpModal');
       showToast('OTP verified', 'success');
       loadPages();
@@ -412,10 +413,11 @@
       if (data.enabled) {
         content.innerHTML = `
           <p><span class="badge badge-green">✓ 2FA Enabled</span></p>
-          <p style="margin:12px 0;color:var(--text3);">Enter your 6-digit code to continue.</p>
+          <p style="margin:12px 0;color:var(--text3);">Enter your 6-digit code to continue, or disable 2FA.</p>
           <div class="form-group"><input type="text" id="otpAuthCode" placeholder="000000" maxlength="6" style="text-align:center;font-size:24px;letter-spacing:8px;" onkeydown="if(event.key==='Enter')submitOtpCode()" autofocus /></div>
-          <div class="modal-actions" style="margin-top:12px;justify-content:center;">
+          <div class="modal-actions" style="margin-top:12px;justify-content:center;gap:8px;">
             <button class="btn btn-primary" onclick="submitOtpCode()">Submit</button>
+            <button class="btn btn-danger" onclick="disableOtp()">Disable 2FA</button>
           </div>
         `;
       } else if (data.hasSecret) {
@@ -469,6 +471,7 @@
       if (!data) return;
       if (data.success) {
         _otpCode = code;
+        sessionStorage.setItem('otpCode', code);
         otpEnabled = true;
         showToast('2FA enabled!', 'success');
         closeModal('otpModal');
@@ -488,12 +491,14 @@
       if (!data) return;
       if (data.success) {
         _otpCode = '';
+        sessionStorage.removeItem('otpCode');
         otpEnabled = false;
         showToast('2FA disabled', 'success');
         closeModal('otpModal');
         loadOtpStatus();
       } else {
         _otpCode = '';
+        sessionStorage.removeItem('otpCode');
         showToast(data.error || 'Failed', 'error');
       }
     }
