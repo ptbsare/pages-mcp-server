@@ -107,7 +107,8 @@ export function createApp(config: ServerConfig) {
   // Deploy: 100MB for zip uploads
   const deployBodyParser = express.json({ limit: "1000mb" });
   // Deploy routes need larger body — register BEFORE global default
-  app.use("/api/deploy", deployBodyParser);
+  app.use("/api/deploy/html", deployBodyParser);
+  app.use("/api/deploy/folder", deployBodyParser);
   // Apply default parser globally (won't override /api/deploy)
   app.use(defaultParser);
   // CORS: only allow same-origin requests (no cross-origin API access)
@@ -353,37 +354,14 @@ export function createApp(config: ServerConfig) {
   });
 
   // ─── File Upload API (for local stdio client) ──────────
-  // Streams to temp file to avoid loading entire file into memory
-  app.post("/api/deploy/file", bearerAuth(db), async (req: Request, res: Response) => {
+  // Uses express.raw() to receive binary body, then processes in memory
+  const rawBodyParser = express.raw({ limit: "1000mb", type: "application/octet-stream" });
+  app.post("/api/deploy/file", bearerAuth(db), rawBodyParser, async (req: Request, res: Response) => {
     const MAX_SIZE = 1024 * 1024 * 1024; // 1GB
-    const tmpDir = path.join(tmpdir(), `pages-upload-${nanoid()}`);
-    let tmpFile = "";
     try {
-      // Stream to temp file with size limit
-      tmpFile = path.join(tmpDir, "upload");
-      fs.mkdirSync(tmpDir, { recursive: true });
-      const writeStream = fs.createWriteStream(tmpFile);
-      let size = 0;
-      let finished = false;
-      await new Promise<void>((resolve, reject) => {
-        req.on("data", (chunk: Buffer) => {
-          if (finished) return;
-          size += chunk.length;
-          if (size > MAX_SIZE) {
-            finished = true;
-            writeStream.destroy();
-            req.destroy();
-            reject(new Error("File too large (max 1GB)"));
-            return;
-          }
-          writeStream.write(chunk);
-        });
-        req.on("end", () => { if (!finished) { finished = true; writeStream.end(); } });
-        req.on("error", (err) => { if (!finished) { finished = true; writeStream.destroy(); reject(err); } });
-        writeStream.on("finish", () => { if (!finished) { finished = true; resolve(); } });
-        writeStream.on("error", (err) => { if (!finished) { finished = true; reject(err); } });
-      });
-      if (size === 0) throw new Error("Empty file");
+      const body = req.body as Buffer;
+      if (!body || body.length === 0) throw new Error("Empty file");
+      if (body.length > MAX_SIZE) throw new Error("File too large (max 1GB)");
 
       // Sanitize filename
       let fileName = String(req.query.filename || `upload-${Date.now()}`);
@@ -394,9 +372,8 @@ export function createApp(config: ServerConfig) {
 
       if (isZip) {
         // Secure zip: check entries BEFORE extraction
-        const fileBuffer = fs.readFileSync(tmpFile);
         const AdmZip = (await import("adm-zip")).default;
-        const zip = new AdmZip(fileBuffer);
+        const zip = new AdmZip(body);
         const entries = zip.getEntries();
         for (const entry of entries) {
           if (entry.entryName.includes("..") || path.isAbsolute(entry.entryName)) {
@@ -406,7 +383,6 @@ export function createApp(config: ServerConfig) {
         const shareId = nanoid(12);
         const dir = path.join(config.storagePath, shareId);
         fs.mkdirSync(dir, { recursive: true });
-        // Extract entries one by one (no extractAllTo)
         for (const entry of entries) {
           const entryPath = path.join(dir, entry.entryName);
           const entryDir = path.dirname(entryPath);
@@ -423,8 +399,7 @@ export function createApp(config: ServerConfig) {
         db.createPage({ id, shareId, name: name || fileName.replace(/\.zip$/i, ""), type: "folder", fileCount, totalSize, createdAt: now, updatedAt: now });
         res.json({ success: true, shareId, url: `${publicUrl}/f/${shareId}`, fileCount, totalSize });
       } else {
-        const fileBuffer = fs.readFileSync(tmpFile);
-        const result = storage.deployFileFromBuffer(fileBuffer, fileName, name);
+        const result = storage.deployFileFromBuffer(body, fileName, name);
         const publicUrl = buildUrl(config.domain, config.outPort);
         const dlUrl = `${publicUrl}/f/${result.shareId}/raw/${encodeURIComponent(result.fileName)}`;
         const id2 = nanoid();
@@ -437,10 +412,6 @@ export function createApp(config: ServerConfig) {
     } catch (err: any) {
       console.error("Upload error:", err);
       res.status(500).json({ error: "Upload failed" });
-    } finally {
-      // Clean up temp file
-      try { if (tmpFile && fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch { /* ignore */ }
-      try { if (fs.existsSync(tmpDir)) fs.rmdirSync(tmpDir); } catch { /* ignore */ }
     }
   });
 
