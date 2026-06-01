@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import express, { Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import mime from "mime-types";
 import path from "path";
@@ -101,7 +102,8 @@ export function createApp(config: ServerConfig) {
     console.error("Admin HTML template not found at", adminHtmlPath);
   }
 
-  // ─── Body parsers ──────────────────────────────────────
+  // ─── Cookie & Body parsers ────────────────────────────
+  app.use(cookieParser());
   // Default: 1MB for most endpoints
   const defaultParser = express.json({ limit: "4mb" });
   // Deploy: 100MB for zip uploads
@@ -601,13 +603,23 @@ export function createApp(config: ServerConfig) {
   // ─── 3. Admin Auth (Basic + optional OTP) ────────────────
   const adminAuth = basicAuth(config.adminUsername, config.adminPassword);
 
-  // OTP middleware — checks if OTP is enabled, if so requires valid code
+  // ─── OTP Session Store ─────────────────────────────────
+  // Maps session tokens to creation time. No expiry — valid until server restart.
+  const otpSessions = new Map<string, number>();
+
+  // OTP middleware — checks if OTP is enabled, if so requires valid OTP session cookie
   const otpMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const otpEnabled = await db.getOtpEnabled();
     if (!otpEnabled) { next(); return; }
+    // Check for valid OTP session cookie
+    const otpCookie = req.cookies?.otp_session;
+    if (otpCookie && otpSessions.has(otpCookie)) {
+      next();
+      return;
+    }
+    // No valid session — require OTP code
     const otpHeader = req.headers["x-otp-code"];
     if (!otpHeader || typeof otpHeader !== "string") {
-      // Use 403 instead of 401 to avoid browser Basic Auth prompt
       res.status(403).json({ error: "OTP required", otpRequired: true } as ErrorResponse);
       return;
     }
@@ -616,6 +628,15 @@ export function createApp(config: ServerConfig) {
       res.status(403).json({ error: "Invalid OTP code" } as ErrorResponse);
       return;
     }
+    // OTP code valid — create session
+    const sessionToken = crypto.randomBytes(32).toString("hex");
+    otpSessions.set(sessionToken, Date.now());
+    res.cookie("otp_session", sessionToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      // No maxAge — cookie lives until browser close or server restart
+    });
     next();
   };
 

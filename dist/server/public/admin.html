@@ -237,7 +237,6 @@
   <script>
     let pages = [], tokens = [], editingId = null, otpEnabled = false;
     let _csrfToken = '';
-    let _otpCode = sessionStorage.getItem('otpCode') || '';
     // OTP decrypt token is in httpOnly cookie (not in HTML for security)
     const _domainUrl = '__DOMAIN_URL__';
 
@@ -259,10 +258,7 @@
       if (opts.method && opts.method !== 'GET' && _csrfToken) {
         headers['X-CSRF-Token'] = _csrfToken;
       }
-      if (_otpCode) {
-        headers['X-OTP-Code'] = _otpCode;
-      }
-      const res = await fetch(path, { headers, ...opts });
+      const res = await fetch(path, { headers, credentials: 'same-origin', ...opts });
       const data = await res.json();
       if (data.otpRequired) { openOtpModal(); return null; }
       if (opts.method && opts.method !== 'GET') { refreshCsrfToken(); }
@@ -271,10 +267,19 @@
     async function submitOtpCode() {
       const code = document.getElementById('otpAuthCode').value.trim();
       if (!code || code.length !== 6) { showToast('Enter a 6-digit code', 'error'); return; }
-      _otpCode = code;
-      sessionStorage.setItem('otpCode', code);
+      // Send OTP code — server will set otp_session cookie if valid
+      const res = await fetch('/api/admin/pages', {
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken, 'X-OTP-Code': code },
+        credentials: 'same-origin'
+      });
+      const data = await res.json();
+      if (data.error && data.otpRequired) {
+        showToast('Invalid OTP code', 'error');
+        return;
+      }
       closeModal('otpModal');
       showToast('OTP verified', 'success');
+      // Reload data — cookie is now set
       loadPages();
       loadTokens();
     }
@@ -470,8 +475,6 @@
       const data = await api('/api/admin/otp/verify', { method: 'POST', body: JSON.stringify({ code }) });
       if (!data) return;
       if (data.success) {
-        _otpCode = code;
-        sessionStorage.setItem('otpCode', code);
         otpEnabled = true;
         showToast('2FA enabled!', 'success');
         closeModal('otpModal');
@@ -490,15 +493,11 @@
       const data = await api('/api/admin/otp/disable', { method: 'POST', body: '{}' });
       if (!data) return;
       if (data.success) {
-        _otpCode = '';
-        sessionStorage.removeItem('otpCode');
         otpEnabled = false;
         showToast('2FA disabled', 'success');
         closeModal('otpModal');
         loadOtpStatus();
       } else {
-        _otpCode = '';
-        sessionStorage.removeItem('otpCode');
         showToast(data.error || 'Failed', 'error');
       }
     }

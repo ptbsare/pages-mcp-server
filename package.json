@@ -13,13 +13,27 @@
     "url": "https://github.com/ptbsare/pages-mcp-server/issues"
   },
   "homepage": "https://github.com/ptbsare/pages-mcp-server#readme",
-  "keywords": ["mcp", "static-site", "deploy", "edgeone", "pages", "model-context-protocol"],
+  "keywords": [
+    "mcp",
+    "static-site",
+    "deploy",
+    "edgeone",
+    "pages",
+    "model-context-protocol"
+  ],
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
-  "files": ["dist/", "server/public/", "LICENSE", "README.md"],
-  "bin": { "pages-mcp": "./dist/cli.js" },
+  "files": [
+    "dist/",
+    "server/public/",
+    "LICENSE",
+    "README.md"
+  ],
+  "bin": {
+    "pages-mcp": "./dist/cli.js"
+  },
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js",
@@ -38,6 +52,7 @@
     "@modelcontextprotocol/sdk": "^1.0.4",
     "adm-zip": "^0.5.16",
     "basic-auth": "^2.0.1",
+    "cookie-parser": "^1.4.7",
     "express": "^4.21.0",
     "express-rate-limit": "^8.5.2",
     "jsonwebtoken": "^9.0.2",
@@ -49,6 +64,7 @@
   "devDependencies": {
     "@types/adm-zip": "^0.5.5",
     "@types/basic-auth": "^1.1.8",
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/mime-types": "^2.1.4",
@@ -58,5 +74,7 @@
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   },
-  "engines": { "node": ">=18.0.0" }
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
