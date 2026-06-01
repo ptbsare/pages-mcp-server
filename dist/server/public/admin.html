@@ -449,13 +449,12 @@
     async function verifyOtp() {
       const code = document.getElementById('otpVerifyCode').value.trim();
       if (!code || code.length !== 6) { showToast('Enter a 6-digit code', 'error'); return; }
-      const res = await fetch('/api/admin/otp/verify', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }, body: JSON.stringify({ code }) });
-      const data = await res.json();
+      const data = await api('/api/admin/otp/verify', { method: 'POST', body: JSON.stringify({ code }) });
+      if (!data) return;
       if (data.success) {
         showToast('2FA enabled!', 'success');
         closeModal('otpModal');
         loadOtpStatus();
-        refreshCsrfToken();
       } else {
         showToast(data.error || 'Invalid code', 'error');
       }
@@ -465,13 +464,12 @@
       if (!confirm('Disable 2FA?')) return;
       const code = prompt('Enter current 6-digit OTP code to confirm:');
       if (!code) return;
-      const res = await fetch('/api/admin/otp/disable', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken(), 'X-OTP-Code': code }, body: '{}' });
-      const data = await res.json();
+      const data = await api('/api/admin/otp/disable', { method: 'POST', headers: { 'X-OTP-Code': code }, body: '{}' });
+      if (!data) return;
       if (data.success) {
         showToast('2FA disabled', 'success');
         closeModal('otpModal');
         loadOtpStatus();
-        refreshCsrfToken();
       } else {
         showToast(data.error || 'Failed', 'error');
       }
