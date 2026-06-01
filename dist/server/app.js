@@ -718,7 +718,7 @@ export function createApp(config) {
             const id = nanoid();
             const now = new Date().toISOString();
             const result = storage.storeZip(shareId, zipBase64);
-            db.createPage({ id, shareId, name: name || `Page ${shareId}`, description, fileCount: result.fileCount, totalSize: result.totalSize, type: "folder", createdAt: now, updatedAt: now });
+            db.createPage({ id, shareId, name: name || `Page ${shareId}`, description, fileCount: result.fileCount, totalSize: result.totalSize, type: "page", createdAt: now, updatedAt: now });
             const url = `${buildUrl(config.domain, config.outPort)}/s/${shareId}`;
             res.status(201).json({ id, shareId, url, name: name || `Page ${shareId}`, fileCount: result.fileCount, totalSize: result.totalSize, createdAt: now });
             const expireDays2 = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);
