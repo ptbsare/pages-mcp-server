@@ -625,7 +625,8 @@ export function createApp(config: ServerConfig) {
     if (!otpEnabled) { next(); return; }
     const otpHeader = req.headers["x-otp-code"];
     if (!otpHeader || typeof otpHeader !== "string") {
-      res.status(401).json({ error: "OTP required", otpRequired: true } as ErrorResponse);
+      // Use 403 instead of 401 to avoid browser Basic Auth prompt
+      res.status(403).json({ error: "OTP required", otpRequired: true } as ErrorResponse);
       return;
     }
     const secret = await db.getOtpSecret();
