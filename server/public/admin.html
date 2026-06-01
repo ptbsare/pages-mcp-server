@@ -267,20 +267,14 @@
     async function submitOtpCode() {
       const code = document.getElementById('otpAuthCode').value.trim();
       if (!code || code.length !== 6) { showToast('Enter a 6-digit code', 'error'); return; }
-      // Send OTP code — server will set otp_session cookie if valid
-      const res = await fetch('/api/admin/pages', {
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken, 'X-OTP-Code': code },
-        credentials: 'same-origin'
-      });
-      const data = await res.json();
-      if (data.error && data.otpRequired) {
-        showToast('Invalid OTP code', 'error');
-        return;
-      }
+      // Send OTP code — server will mark session as OTP-verified
+      const data = await api('/api/admin/pages', { headers: { 'X-OTP-Code': code } });
+      if (!data) { showToast('Invalid OTP code', 'error'); return; }
       closeModal('otpModal');
       showToast('OTP verified', 'success');
-      // Reload data — cookie is now set
-      loadPages();
+      pages = data.pages || [];
+      document.getElementById('totalPages').textContent = data.total || 0;
+      renderTable();
       loadTokens();
     }
 

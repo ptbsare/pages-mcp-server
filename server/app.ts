@@ -10,7 +10,7 @@ import { nanoid } from "nanoid";
 import crypto from "crypto";
 import { PagesDatabase } from "./db.js";
 import { FileStorage } from "./storage.js";
-import { bearerAuth, basicAuth } from "./auth.js";
+import { bearerAuth } from "./auth.js";
 import type {
   ServerConfig,
   DeployedPage,
@@ -83,6 +83,14 @@ function verifyOtpToken(secret: string, token: string): boolean {
 
 function buildOtpauthUrl(secret: string, username: string, domain: string): string {
   return `otpauth://totp/${encodeURIComponent(domain)}:${encodeURIComponent(username)}?secret=${secret}&issuer=${encodeURIComponent(domain)}`;
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  if (bufA.length === 0) return true;
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 export function createApp(config: ServerConfig) {
@@ -600,24 +608,70 @@ export function createApp(config: ServerConfig) {
     }
   });
 
-  // ─── 3. Admin Auth (Basic + optional OTP) ────────────────
-  const adminAuth = basicAuth(config.adminUsername, config.adminPassword);
+  // ─── 3. Admin Auth (Session Cookie) ─────────────────────
+  // Admin session store: maps session tokens to { created, otpVerified }
+  // No expiry — valid until server restart.
+  const adminSessions = new Map<string, { created: number; otpVerified: boolean }>();
 
-  // ─── OTP Session Store ─────────────────────────────────
-  // Maps session tokens to creation time. No expiry — valid until server restart.
-  const otpSessions = new Map<string, number>();
+  // Generate a new admin session token
+  function createAdminSession(otpVerified: boolean): string {
+    const token = crypto.randomBytes(32).toString("hex");
+    adminSessions.set(token, { created: Date.now(), otpVerified });
+    return token;
+  }
 
-  // OTP middleware — checks if OTP is enabled, if so requires valid OTP session cookie
-  const otpMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const otpEnabled = await db.getOtpEnabled();
-    if (!otpEnabled) { next(); return; }
-    // Check for valid OTP session cookie
-    const otpCookie = req.cookies?.otp_session;
-    if (otpCookie && otpSessions.has(otpCookie)) {
+  // Admin auth middleware — checks session cookie, or validates Basic Auth on first login
+  const adminAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Check for valid session cookie first
+    const sessionCookie = req.cookies?.admin_session;
+    if (sessionCookie && adminSessions.has(sessionCookie)) {
+      // Session exists — attach to req for downstream use
+      (req as any).adminSession = adminSessions.get(sessionCookie);
       next();
       return;
     }
-    // No valid session — require OTP code
+    // No session — require Basic Auth for initial login
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Basic ")) {
+      res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf-8");
+    const colonIdx = decoded.indexOf(":");
+    if (colonIdx === -1) {
+      res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
+    }
+    const user = decoded.substring(0, colonIdx);
+    const pass = decoded.substring(colonIdx + 1);
+    const userValid = safeEqual(user, config.adminUsername);
+    const passValid = safeEqual(pass, config.adminPassword);
+    if (!userValid || !passValid) {
+      res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
+    }
+    // Basic Auth valid — create session
+    const otpEnabled = await db.getOtpEnabled();
+    const sessionToken = createAdminSession(!otpEnabled); // otpVerified=true if OTP not enabled
+    res.cookie("admin_session", sessionToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+    });
+    (req as any).adminSession = adminSessions.get(sessionToken);
+    next();
+  };
+
+  // OTP middleware — if OTP enabled, require verified OTP session or valid OTP code
+  const otpMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const otpEnabled = await db.getOtpEnabled();
+    if (!otpEnabled) { next(); return; }
+    const session = (req as any).adminSession;
+    if (session?.otpVerified) { next(); return; }
+    // Session not OTP-verified — require OTP code
     const otpHeader = req.headers["x-otp-code"];
     if (!otpHeader || typeof otpHeader !== "string") {
       res.status(403).json({ error: "OTP required", otpRequired: true } as ErrorResponse);
@@ -628,15 +682,8 @@ export function createApp(config: ServerConfig) {
       res.status(403).json({ error: "Invalid OTP code" } as ErrorResponse);
       return;
     }
-    // OTP code valid — create session
-    const sessionToken = crypto.randomBytes(32).toString("hex");
-    otpSessions.set(sessionToken, Date.now());
-    res.cookie("otp_session", sessionToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      // No maxAge — cookie lives until browser close or server restart
-    });
+    // OTP valid — mark session as verified
+    if (session) session.otpVerified = true;
     next();
   };
 
