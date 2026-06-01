@@ -1,15 +1,19 @@
 # Pages MCP Server
 
-Self-hosted MCP server for deploying and managing static websites. Deploy HTML pages or entire folders via MCP tools or REST API, and get shareable public URLs like `https://domain.com/s/hdhdjsjhsguh`.
+Self-hosted MCP server for deploying and managing static websites, and sharing files/folders. Deploy HTML pages or entire folders via MCP tools or REST API, and get shareable public URLs.
 
 ## Features
 
 - **Deploy HTML strings** — send raw HTML, get a public URL
 - **Deploy folders** — zip a local site folder, deploy all files (CSS, JS, images…)
+- **Share files/folders** — share files or directories with preview support (images, text, code with syntax highlighting)
 - **Public page serving** — all deployed pages accessible at `/s/:shareId`, no auth required
-- **MCP protocol** — 4 tools: `deploy_html`, `deploy_folder`, `list_pages`, `delete_page`
+- **File sharing** — shared files/folders accessible at `/f/:shareId` with file listing, preview, and zip download
+- **MCP protocol** — 5 tools: `deploy_html`, `deploy_folder`, `deploy_file`, `list_pages`, `delete_page`
 - **Multi-token auth** — create/revoke API tokens from the admin dashboard
 - **Admin dashboard** — web UI at `/` for managing pages, tokens, and 2FA settings
+- **Lock/unlock pages** — prevent auto-cleanup of important pages
+- **Auto-cleanup** — automatically delete expired shares (configurable via `SHARE_EXPIRE_DAYS`)
 - **Two-factor authentication (2FA)** — optional TOTP-based 2FA for admin access (Google Authenticator compatible)
 - **Docker support** — multi-arch images on GHCR, multi-stage build, non-root user
 - **npx runnable** — no install needed, run directly from GitHub
@@ -29,7 +33,7 @@ npx github:ptbsare/pages-mcp-server server \
 
 After starting, access the **admin dashboard** at `https://mysite.com:3000/`. Log in with the admin username/password you set. From there you can:
 - Create & manage API tokens
-- View & delete deployed pages
+- View, lock/unlock & delete deployed pages and file shares
 - Enable 2FA (TOTP) for admin access
 
 **Start stdio MCP client** (for AI assistants like Cursor, Claude Desktop):
@@ -95,7 +99,7 @@ All persistent data lives under `/data` inside the container. **You must mount t
 | Container Path | Description | Mount Recommendation |
 |----------------|-------------|---------------------|
 | `/data/db/pages.db` | SQLite database (pages, tokens, OTP settings) | **Required** |
-| `/data/storage/` | Deployed static files (all `/s/:shareId` content) | **Required** |
+| `/data/storage/` | Deployed static files (all `/s/:shareId` and `/f/:shareId` content) | **Required** |
 
 **Named volume (recommended):**
 ```bash
@@ -171,6 +175,63 @@ npm run build
 node dist/server/index.js
 ```
 
+## Nginx Reverse Proxy
+
+An example `nginx.conf` is included in the repository. Key points:
+
+```nginx
+upstream pages_mcp {
+    server 127.0.0.1:38300;
+    keepalive 32;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name your.domain.com;
+
+    # SSL config ...
+
+    # CSP: allow blob: for image preview (URL.createObjectURL), data: for inline images
+    proxy_hide_header Content-Security-Policy;
+    add_header Content-Security-Policy "default-src * data: blob: 'unsafe-eval' 'unsafe-inline'" always;
+
+    # Admin dashboard
+    location / { proxy_pass http://pages_mcp; ... }
+
+    # REST API
+    location /api/ { proxy_pass http://pages_mcp; ... }
+
+    # Deploy API (larger body limit for file uploads)
+    location /api/deploy {
+        proxy_pass http://pages_mcp;
+        client_max_body_size 1000m;
+        ...
+    }
+
+    # MCP JSON-RPC endpoint
+    location /mcp { proxy_pass http://pages_mcp; ... }
+
+    # Static pages
+    location /s/ { proxy_pass http://pages_mcp; ... }
+
+    # File shares (with upload support)
+    location /f/ {
+        proxy_pass http://pages_mcp;
+        client_max_body_size 1000m;
+        ...
+    }
+
+    # Health check
+    location /health { proxy_pass http://pages_mcp; access_log off; }
+}
+```
+
+**Important notes:**
+- `proxy_hide_header Content-Security-Policy` — strips the server's CSP so nginx's own CSP takes effect
+- `blob:` in CSP — required for image preview (uses `URL.createObjectURL`)
+- `client_max_body_size 1000m` — required on `/api/deploy` and `/f/` for large file uploads
+- Replace `__SERVER_NAME__` in the config file with your actual domain: `sed -i 's/__SERVER_NAME__/your.domain.com/g' nginx.conf`
+
 ## Architecture
 
 ```
@@ -181,10 +242,14 @@ node dist/server/index.js
 │  /mcp               → MCP JSON-RPC (Bearer token auth)   │
 │  /api/deploy/html   → Deploy HTML string                 │
 │  /api/deploy/folder → Deploy zip archive (base64)        │
+│  /api/deploy/file   → Upload file/folder (raw body)      │
 │  /api/admin/pages   → CRUD pages (Basic auth + 2FA)      │
 │  /api/admin/tokens  → CRUD API tokens (Basic auth + 2FA) │
 │  /api/admin/otp/*   → OTP setup/verify/disable           │
 │  /s/:shareId        → Public static page (no auth)       │
+│  /f/:shareId        → File share page (no auth)          │
+│  /f/:shareId/raw/** → File download (no auth)            │
+│  /f/:shareId/list/**→ Directory listing JSON (no auth)   │
 │  /health            → Health check                       │
 │                                                          │
 │  sql.js (SQLite) + File Storage                          │
@@ -222,6 +287,14 @@ The admin panel supports optional two-factor authentication using TOTP (Google A
 
 **Disable:** Click "🔐 2FA" → "Disable 2FA" → enter current code to confirm
 
+### URL Types
+
+| URL Pattern | Type | Description |
+|-------------|------|-------------|
+| `/s/:shareId` | Static Page | HTML/CSS/JS website deployed via `deploy_html` or `deploy_folder` |
+| `/f/:shareId` | File Share | File listing page with preview, deployed via `deploy_file` |
+| `/f/:shareId/raw/**` | File Download | Direct file download or preview |
+
 ### REST Endpoints
 
 #### Deploy HTML
@@ -250,6 +323,21 @@ base64 -w0 site.zip | xargs -I{} curl -X POST https://mysite.com/api/deploy/fold
   -d '{"zipBase64": "{}", "name": "My Site"}'
 ```
 
+#### Deploy File (upload)
+```bash
+# Single file
+curl -X POST "https://mysite.com/api/deploy/file?filename=report.pdf" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @report.pdf
+
+# Folder (zip)
+curl -X POST "https://mysite.com/api/deploy/file?filename=my-site.zip&name=My Site" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @my-site.zip
+```
+
 #### Token Management
 ```bash
 # List tokens
@@ -269,6 +357,16 @@ curl -X DELETE -u admin:password https://mysite.com/api/admin/tokens/<id>
 # List pages
 curl -u admin:password https://mysite.com/api/admin/pages
 
+# Lock page (prevent auto-cleanup)
+curl -X POST -u admin:password https://mysite.com/api/admin/pages/<id>/lock \
+  -H "Content-Type: application/json" \
+  -d '{"locked": true}'
+
+# Unlock page
+curl -X POST -u admin:password https://mysite.com/api/admin/pages/<id>/lock \
+  -H "Content-Type: application/json" \
+  -d '{"locked": false}'
+
 # Update page
 curl -X PUT -u admin:password https://mysite.com/api/admin/pages/<id> \
   -H "Content-Type: application/json" \
@@ -280,12 +378,13 @@ curl -X DELETE -u admin:password https://mysite.com/api/admin/pages/<id>
 
 ### MCP Tools
 
-| Tool | Description | Required |
-|------|-------------|----------|
+| Tool | Description | Required Args |
+|------|-------------|---------------|
 | `deploy_html` | Deploy an HTML string as a public page | `value` (string) |
-| `deploy_folder` | Deploy a local folder (must contain index.html) | `path` (string) |
-| `list_pages` | List all deployed pages | — |
-| `delete_page` | Delete a page by ID | `id` (string) |
+| `deploy_folder` | Deploy a local folder as a static website (must contain index.html) | `path` (string) |
+| `deploy_file` | Share a local file or folder | `path` (string) |
+| `list_pages` | List all deployed pages and shares | — |
+| `delete_page` | Delete a page or share by ID | `id` (string) |
 
 All tools accept optional `name` and `description` parameters.
 
@@ -341,6 +440,7 @@ All tools accept optional `name` and `description` parameters.
 | `AUTH_TOKEN` | *(none)* | Initial API token(s), comma-separated. Seeded into DB on first startup only. |
 | `DB_PATH` | ~/.pages-mcp/pages.db | SQLite database path |
 | `STORAGE_PATH` | ~/.pages-mcp/storage | File storage path |
+| `SHARE_EXPIRE_DAYS` | 0 (disabled) | Auto-delete shares older than N days. Set to 0 to disable. |
 
 > **Note:** `AUTH_TOKEN` is only used for initial seeding. After that, manage tokens via the admin dashboard at `/`. You can create multiple tokens, and revoke them anytime.
 
@@ -352,7 +452,7 @@ Images are published to GHCR on every push:
 |-----|------|
 | `beta` | Every push to `main` |
 | `v{version}` | On tag push (e.g. `v1.2.3`) |
-| `v{major}.{minor}}` | On tag push (e.g. `v1.2`) |
+| `v{major}.{minor}` | On tag push (e.g. `v1.2`) |
 | `latest` | On tag push |
 
 ```bash
