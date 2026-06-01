@@ -1022,7 +1022,7 @@ export function createApp(config) {
         }
     });
     // ─── 5. Admin Dashboard (served at /) ────────────────────
-    app.get("/", adminAuth, otpMiddleware, (req, res) => {
+    app.get("/", adminAuth, (req, res) => {
         const publicUrl = buildUrl(config.domain, config.outPort);
         // Inject domain URL into HTML
         const html = adminHtmlTemplate.replace('__DOMAIN_URL__', publicUrl);
