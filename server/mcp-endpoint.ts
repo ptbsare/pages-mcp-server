@@ -213,7 +213,9 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
         }
 
         if (name === "list_pages") {
-          const { limit = 50, offset = 0 } = args as any;
+          let { limit = 50, offset = 0 } = args as any;
+          // limit=0 means "no limit" — return all pages
+          if (limit === 0) limit = 999999;
           const result = await db.listPages(limit, offset);
 
           if (result.pages.length === 0) {

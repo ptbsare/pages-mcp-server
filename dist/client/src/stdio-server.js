@@ -140,6 +140,9 @@ export async function startStdioServer(remoteUrl, authToken) {
                     }
                     const fs = await import("fs");
                     const pathMod = await import("path");
+                    if (!fs.existsSync(path)) {
+                        return { content: [{ type: "text", text: `Error: Folder not found: ${path}` }], isError: true };
+                    }
                     const indexPath = pathMod.join(path, "index.html");
                     if (!fs.existsSync(indexPath)) {
                         return { content: [{ type: "text", text: "Error: Folder must contain an index.html file at the root." }], isError: true };

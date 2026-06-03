@@ -199,7 +199,10 @@ export function createMcpHandler(config, db, storage) {
                     return;
                 }
                 if (name === "list_pages") {
-                    const { limit = 50, offset = 0 } = args;
+                    let { limit = 50, offset = 0 } = args;
+                    // limit=0 means "no limit" — return all pages
+                    if (limit === 0)
+                        limit = 999999;
                     const result = await db.listPages(limit, offset);
                     if (result.pages.length === 0) {
                         res.json({
