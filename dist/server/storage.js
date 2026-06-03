@@ -370,10 +370,15 @@ export class FileStorage {
             return null;
         const pageDir = this.getPageDir(shareId);
         const files = this.listFiles(pageDir);
+        // For file shares, get the actual filename from disk (not page.name which is the display name)
+        let actualFileName;
+        if (page.type === "file" && files.length > 0) {
+            actualFileName = files[0];
+        }
         return {
             type: page.type || (files.length > 1 ? "folder" : "file"),
             folderName: page.name,
-            fileName: page.type === "file" ? page.name : undefined,
+            fileName: actualFileName,
             fileCount: page.fileCount || files.length,
             totalSize: page.totalSize || 0,
             createdAt: page.createdAt,
