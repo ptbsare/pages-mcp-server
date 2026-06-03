@@ -79,6 +79,10 @@ export async function startStdioServer(remoteUrl, authToken) {
                                 type: "string",
                                 description: "Optional human-readable name for the page.",
                             },
+                            description: {
+                                type: "string",
+                                description: "Optional description for the page.",
+                            },
                         },
                         required: ["path"],
                     },
@@ -96,6 +100,10 @@ export async function startStdioServer(remoteUrl, authToken) {
                             name: {
                                 type: "string",
                                 description: "Optional display name for the share.",
+                            },
+                            description: {
+                                type: "string",
+                                description: "Optional description for the share.",
                             },
                         },
                         required: ["path"],
@@ -126,7 +134,7 @@ export async function startStdioServer(remoteUrl, authToken) {
                     break;
                 }
                 case "deploy_folder": {
-                    const { path, name } = args;
+                    const { path, name, description } = args;
                     if (!path) {
                         return { content: [{ type: "text", text: "Error: Missing required argument: path" }], isError: true };
                     }
@@ -136,12 +144,12 @@ export async function startStdioServer(remoteUrl, authToken) {
                     if (!fs.existsSync(indexPath)) {
                         return { content: [{ type: "text", text: "Error: Folder must contain an index.html file at the root." }], isError: true };
                     }
-                    text = await client.deployFolder(path, name);
+                    text = await client.deployFolder(path, name, description);
                     break;
                 }
                 case "deploy_file": {
-                    const { path, name } = args;
-                    text = await client.deployFile(path, name);
+                    const { path, name, description } = args;
+                    text = await client.deployFile(path, name, description);
                     break;
                 }
                 default:

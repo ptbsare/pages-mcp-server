@@ -395,6 +395,7 @@ export function createApp(config: ServerConfig) {
       if (!fileName) fileName = `upload-${Date.now()}`;
       const isZip = fileName.toLowerCase().endsWith(".zip");
       const name = String(req.query.name || "") || undefined;
+      const description = String(req.query.description || "") || undefined;
 
       if (isZip) {
         // Secure zip: check entries BEFORE extraction
@@ -422,7 +423,7 @@ export function createApp(config: ServerConfig) {
         const publicUrl = buildUrl(config.domain, config.outPort);
         const id = nanoid();
         const now = new Date().toISOString();
-        db.createPage({ id, shareId, name: name || fileName.replace(/\.zip$/i, ""), type: "folder", fileCount, totalSize, createdAt: now, updatedAt: now });
+        db.createPage({ id, shareId, name: name || fileName.replace(/\.zip$/i, ""), description, type: "folder", fileCount, totalSize, createdAt: now, updatedAt: now });
         res.json({ success: true, shareId, url: `${publicUrl}/f/${shareId}`, fileCount, totalSize });
       } else {
         const result = storage.deployFileFromBuffer(body, fileName, name);
@@ -430,7 +431,7 @@ export function createApp(config: ServerConfig) {
         const dlUrl = `${publicUrl}/f/${result.shareId}/raw/${encodeURIComponent(result.fileName)}`;
         const id2 = nanoid();
         const now2 = new Date().toISOString();
-        db.createPage({ id: id2, shareId: result.shareId, name: name || fileName, type: "file", fileCount: 1, totalSize: result.fileSize, createdAt: now2, updatedAt: now2 });
+        db.createPage({ id: id2, shareId: result.shareId, name: name || fileName, description, type: "file", fileCount: 1, totalSize: result.fileSize, createdAt: now2, updatedAt: now2 });
         res.json({ success: true, shareId: result.shareId, url: dlUrl, fileName: result.fileName, fileSize: result.fileSize });
       }
       const expireDays = parseInt(process.env.SHARE_EXPIRE_DAYS || "0", 10);

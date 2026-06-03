@@ -152,7 +152,8 @@ export class PagesMcpHttpClient {
             // Single file: read and upload
             const fileName = path.basename(localPath);
             const content = fs.readFileSync(localPath);
-            const resp = await fetch(`${this.baseUrl}/api/deploy/file?filename=${encodeURIComponent(fileName)}&name=${encodeURIComponent(name || "")}`, {
+            const descParam = description ? `&description=${encodeURIComponent(description)}` : "";
+            const resp = await fetch(`${this.baseUrl}/api/deploy/file?filename=${encodeURIComponent(fileName)}&name=${encodeURIComponent(name || "")}${descParam}`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${this.authToken}`, "Content-Type": "application/octet-stream" },
                 body: content,
@@ -182,7 +183,8 @@ export class PagesMcpHttpClient {
             addDir(localPath, "");
             const zipBuffer = zip.toBuffer();
             const zipName = (name || path.basename(localPath)) + ".zip";
-            const resp = await fetch(`${this.baseUrl}/api/deploy/file?filename=${encodeURIComponent(zipName)}&name=${encodeURIComponent(name || "")}`, {
+            const descParam = description ? `&description=${encodeURIComponent(description)}` : "";
+            const resp = await fetch(`${this.baseUrl}/api/deploy/file?filename=${encodeURIComponent(zipName)}&name=${encodeURIComponent(name || "")}${descParam}`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${this.authToken}`, "Content-Type": "application/octet-stream" },
                 body: zipBuffer,

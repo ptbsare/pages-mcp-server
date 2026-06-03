@@ -80,6 +80,50 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
                 },
               },
               {
+                name: "deploy_folder",
+                description: "Deploy a local folder (zip) as a static page.",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    zipBase64: {
+                      type: "string",
+                      description: "Base64-encoded zip archive of the folder.",
+                    },
+                    name: {
+                      type: "string",
+                      description: "Optional human-readable name.",
+                    },
+                    description: {
+                      type: "string",
+                      description: "Optional description for the page.",
+                    },
+                  },
+                  required: ["zipBase64"],
+                },
+              },
+              {
+                name: "deploy_file",
+                description: "Upload a raw file to the server.",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    filename: {
+                      type: "string",
+                      description: "The filename.",
+                    },
+                    name: {
+                      type: "string",
+                      description: "Optional display name.",
+                    },
+                    description: {
+                      type: "string",
+                      description: "Optional description for the share.",
+                    },
+                  },
+                  required: ["filename"],
+                },
+              },
+              {
                 name: "list_pages",
                 description: "List all deployed pages.",
                 inputSchema: {
@@ -190,7 +234,8 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
               const lockInfo = p.locked ? " [🔒]" : "";
               const typeIcon = p.type === "folder" ? "📁" : p.type === "file" ? "📄" : "🌐";
               const sizeInfo = p.totalSize ? ` (${p.totalSize} bytes)` : "";
-              return `${typeIcon} ${p.name}${lockInfo}${sizeInfo}\n   ID: ${p.id}\n   URL: ${url}\n   Type: ${p.type || "page"}\n   Created: ${p.createdAt}`;
+              const descInfo = p.description ? `\n   Description: ${p.description}` : "";
+              return `${typeIcon} ${p.name}${lockInfo}${sizeInfo}\n   ID: ${p.id}\n   URL: ${url}\n   Type: ${p.type || "page"}${descInfo}\n   Created: ${p.createdAt}`;
             })
             .join("\n\n");
 

@@ -88,6 +88,10 @@ export async function startStdioServer(remoteUrl: string, authToken: string): Pr
                 type: "string",
                 description: "Optional human-readable name for the page.",
               },
+              description: {
+                type: "string",
+                description: "Optional description for the page.",
+              },
             },
             required: ["path"],
           },
@@ -106,6 +110,10 @@ export async function startStdioServer(remoteUrl: string, authToken: string): Pr
               name: {
                 type: "string",
                 description: "Optional display name for the share.",
+              },
+              description: {
+                type: "string",
+                description: "Optional description for the share.",
               },
             },
             required: ["path"],
@@ -139,7 +147,7 @@ export async function startStdioServer(remoteUrl: string, authToken: string): Pr
           break;
         }
         case "deploy_folder": {
-          const { path, name } = args as any;
+          const { path, name, description } = args as any;
           if (!path) {
             return { content: [{ type: "text" as const, text: "Error: Missing required argument: path" }], isError: true };
           }
@@ -149,12 +157,12 @@ export async function startStdioServer(remoteUrl: string, authToken: string): Pr
           if (!fs.existsSync(indexPath)) {
             return { content: [{ type: "text" as const, text: "Error: Folder must contain an index.html file at the root." }], isError: true };
           }
-          text = await client.deployFolder(path, name);
+          text = await client.deployFolder(path, name, description);
           break;
         }
         case "deploy_file": {
-          const { path, name } = args as any;
-          text = await client.deployFile(path, name);
+          const { path, name, description } = args as any;
+          text = await client.deployFile(path, name, description);
           break;
         }
         default:
