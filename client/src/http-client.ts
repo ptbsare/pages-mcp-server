@@ -57,8 +57,19 @@ export class PagesMcpHttpClient {
     return result.tools || [];
   }
 
-  async deployHtml(value: string, name?: string, description?: string): Promise<string> {
+  async deployHtml(valueOrPath?: string, name?: string, description?: string, isPath?: boolean): Promise<string> {
     await this.initialize();
+    let value: string | undefined = valueOrPath;
+    // If isPath is true, read the file
+    if (isPath && valueOrPath) {
+      if (!fs.existsSync(valueOrPath)) {
+        throw new Error(`File not found: ${valueOrPath}`);
+      }
+      value = fs.readFileSync(valueOrPath, "utf-8");
+    }
+    if (!value) {
+      throw new Error("Missing required argument: value or path");
+    }
     const result = await this.rpcCall("tools/call", {
       name: "deploy_html",
       arguments: { value, name, description },

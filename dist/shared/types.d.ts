@@ -62,7 +62,10 @@ export interface ServerConfig {
 export declare function buildUrl(domain: string, outPort: number): string;
 /** MCP tool: deploy_html input */
 export interface DeployHtmlInput {
-    value: string;
+    /** HTML content to deploy (mutually exclusive with path) */
+    value?: string;
+    /** Local file path to HTML file (mutually exclusive with value) */
+    path?: string;
     name?: string;
     description?: string;
 }

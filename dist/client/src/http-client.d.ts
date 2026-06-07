@@ -6,7 +6,7 @@ export declare class PagesMcpHttpClient {
     private rpcCall;
     initialize(): Promise<void>;
     listTools(): Promise<any[]>;
-    deployHtml(value: string, name?: string, description?: string): Promise<string>;
+    deployHtml(valueOrPath?: string, name?: string, description?: string, isPath?: boolean): Promise<string>;
     deployFolder(localPath: string, name?: string, description?: string): Promise<string>;
     listPages(limit?: number, offset?: number): Promise<string>;
     deletePage(id: string): Promise<string>;

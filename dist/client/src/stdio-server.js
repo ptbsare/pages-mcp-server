@@ -23,13 +23,17 @@ export async function startStdioServer(remoteUrl, authToken) {
             tools: [
                 {
                     name: "deploy_html",
-                    description: "Deploy an HTML string as a publicly accessible static page on the remote server. Returns a shareable URL.",
+                    description: "Deploy an HTML string or local file as a publicly accessible static page on the remote server. Returns a shareable URL.",
                     inputSchema: {
                         type: "object",
                         properties: {
                             value: {
                                 type: "string",
-                                description: "The complete HTML content to deploy.",
+                                description: "The complete HTML content to deploy. Mutually exclusive with path.",
+                            },
+                            path: {
+                                type: "string",
+                                description: "Absolute path to a local HTML file to deploy. Mutually exclusive with value.",
                             },
                             name: {
                                 type: "string",
@@ -40,7 +44,6 @@ export async function startStdioServer(remoteUrl, authToken) {
                                 description: "Optional description for the page.",
                             },
                         },
-                        required: ["value"],
                     },
                 },
                 {
@@ -119,8 +122,14 @@ export async function startStdioServer(remoteUrl, authToken) {
             let text;
             switch (name) {
                 case "deploy_html": {
-                    const { value, name: pageName, description } = args;
-                    text = await client.deployHtml(value, pageName, description);
+                    const { value, path, name: pageName, description } = args;
+                    // Support both value (HTML string) and path (local file)
+                    if (path) {
+                        text = await client.deployHtml(path, name, description, true);
+                    }
+                    else {
+                        text = await client.deployHtml(value, pageName, description);
+                    }
                     break;
                 }
                 case "list_pages": {
