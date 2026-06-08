@@ -6,7 +6,9 @@ export declare class PagesMcpHttpClient {
     private rpcCall;
     initialize(): Promise<void>;
     listTools(): Promise<any[]>;
+    /** Deploy a single HTML file as a website. Returns a public URL. */
     deployHtml(valueOrPath?: string, name?: string, description?: string, isPath?: boolean): Promise<string>;
+    /** Deploy a local folder as a static website. Must contain index.html. Returns a public URL. */
     deployFolder(localPath: string, name?: string, description?: string): Promise<string>;
     listPages(limit?: number, offset?: number): Promise<string>;
     deletePage(id: string): Promise<string>;
@@ -23,6 +25,7 @@ export declare class PagesMcpHttpClient {
      * Deploy a local file or folder to the remote server.
      * Reads the file/folder locally, uploads via REST API.
      */
+    /** Share a local file or folder for file sharing (NOT for website deployment). */
     deployFile(localPath: string, name?: string, description?: string): Promise<string>;
 }
 //# sourceMappingURL=http-client.d.ts.map

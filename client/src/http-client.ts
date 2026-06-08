@@ -57,6 +57,7 @@ export class PagesMcpHttpClient {
     return result.tools || [];
   }
 
+  /** Deploy a single HTML file as a website. Returns a public URL. */
   async deployHtml(valueOrPath?: string, name?: string, description?: string, isPath?: boolean): Promise<string> {
     await this.initialize();
     let value: string | undefined = valueOrPath;
@@ -88,6 +89,7 @@ export class PagesMcpHttpClient {
     return result.content?.[0]?.text || "No response";
   }
 
+  /** Deploy a local folder as a static website. Must contain index.html. Returns a public URL. */
   async deployFolder(localPath: string, name?: string, description?: string): Promise<string> {
     // Validate local path (SSRF prevention)
     this.validateLocalPath(localPath);
@@ -178,6 +180,7 @@ export class PagesMcpHttpClient {
    * Deploy a local file or folder to the remote server.
    * Reads the file/folder locally, uploads via REST API.
    */
+  /** Share a local file or folder for file sharing (NOT for website deployment). */
   async deployFile(localPath: string, name?: string, description?: string): Promise<string> {
     if (!fs.existsSync(localPath)) {
       throw new Error(`Path not found: ${localPath}`);

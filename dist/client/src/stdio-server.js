@@ -23,7 +23,7 @@ export async function startStdioServer(remoteUrl, authToken) {
             tools: [
                 {
                     name: "deploy_html",
-                    description: "Deploy an HTML string or local file as a publicly accessible static page on the remote server. Returns a shareable URL.",
+                    description: "Deploy a single HTML file as a website. Returns a public URL for the deployed page.",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -70,7 +70,7 @@ export async function startStdioServer(remoteUrl, authToken) {
                 },
                 {
                     name: "deploy_folder",
-                    description: "Deploy a local folder containing a static website to the remote server. Recursively uploads all files preserving directory structure. The folder should contain an index.html at the root. Returns a shareable URL.",
+                    description: "Deploy a local folder as a static website. Recursively uploads all files. The folder must contain index.html at the root. Returns a public URL.",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -92,7 +92,7 @@ export async function startStdioServer(remoteUrl, authToken) {
                 },
                 {
                     name: "deploy_file",
-                    description: "Share a local file or folder to the remote server. For a single file, returns a direct download link. For a folder, preserves nested directory structure and returns a share page URL.",
+                    description: "Share a local file or folder for file sharing (NOT for website deployment). For a single file, returns a direct download link. For a folder without index.html, returns a file listing page. Use deploy_html or deploy_folder to deploy websites.",
                     inputSchema: {
                         type: "object",
                         properties: {

@@ -50,6 +50,7 @@ export class PagesMcpHttpClient {
         const result = await this.rpcCall("tools/list");
         return result.tools || [];
     }
+    /** Deploy a single HTML file as a website. Returns a public URL. */
     async deployHtml(valueOrPath, name, description, isPath) {
         await this.initialize();
         let value = valueOrPath;
@@ -80,6 +81,7 @@ export class PagesMcpHttpClient {
         });
         return result.content?.[0]?.text || "No response";
     }
+    /** Deploy a local folder as a static website. Must contain index.html. Returns a public URL. */
     async deployFolder(localPath, name, description) {
         // Validate local path (SSRF prevention)
         this.validateLocalPath(localPath);
@@ -170,6 +172,7 @@ export class PagesMcpHttpClient {
      * Deploy a local file or folder to the remote server.
      * Reads the file/folder locally, uploads via REST API.
      */
+    /** Share a local file or folder for file sharing (NOT for website deployment). */
     async deployFile(localPath, name, description) {
         if (!fs.existsSync(localPath)) {
             throw new Error(`Path not found: ${localPath}`);
