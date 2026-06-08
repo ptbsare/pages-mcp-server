@@ -271,8 +271,14 @@ export function createApp(config: ServerConfig) {
     if (!stat.isFile()) { res.status(404).send("<h1>404 - Not a file</h1>"); return; }
     const mimeType = mime.lookup(fullPath) || "application/octet-stream";
     res.setHeader("Content-Type", mimeType);
-    // Sub-resources: allow same-origin CSS/JS/images (from the deployed page)
-    res.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'");
+    // Sub-resources: default allows everything (matching index.html policy)
+    // Set STRICT_SHARE_CSP=1 to enforce same-origin only
+    const strictCspSub = process.env.STRICT_SHARE_CSP === "1";
+    if (strictCspSub) {
+      res.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'");
+    } else {
+      res.setHeader("Content-Security-Policy", "default-src *; script-src *; style-src *; img-src *; font-src *; frame-src 'none'; object-src 'none'");
+    }
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
     res.sendFile(fullPath);
