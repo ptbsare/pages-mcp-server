@@ -150,7 +150,7 @@ export class PagesMcpHttpClient {
                 throw new Error(`Path not allowed: ${localPath}. Allowed prefixes: ${allowPaths.join(", ")}`);
             return;
         }
-        const defaultBlocked = ["/etc", "/root", "/home", "/var", "/usr", "/proc", "/sys", "/dev", "/boot", "/bin", "/sbin", "/lib", "/lib64"];
+        const defaultBlocked = ["/etc", "/root/.ssh", "/var", "/usr", "/proc", "/sys", "/dev", "/boot", "/bin", "/sbin", "/lib", "/lib64"];
         const blockPaths = (process.env.DEPLOY_BLOCK_PATHS || defaultBlocked.join(",")).split(",").map(p => p.trim()).filter(Boolean);
         for (const prefix of blockPaths) {
             const resolvedPrefix = path.resolve(prefix);
