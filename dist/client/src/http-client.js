@@ -136,7 +136,8 @@ export class PagesMcpHttpClient {
      * Validate local path before uploading.
      * Environment variables:
      *   DEPLOY_ALLOW_PATHS — comma-separated list of allowed path prefixes (e.g. "/home/user/projects,/tmp")
-     *   DEPLOY_BLOCK_PATHS — comma-separated list of blocked path prefixes (default: /etc,/root,/home,/var,/usr,/proc,/sys,/dev,/boot,/bin,/sbin,/lib,/lib64)
+     *   DEPLOY_BLOCK_PATHS — comma-separated list of blocked path prefixes (default: /etc,/var,/usr,/proc,/sys,/dev,/boot,/bin,/sbin,/lib,/lib64)
+     *   DEPLOY_BLOCK_ROOT_DIRS — comma-separated list of blocked dirs under /root (default: /root/.ssh,/root/.gnupg,/root/.aws,/root/.docker,/root/.kube,/root/.config,/root/.local,/root/.npmrc,/root/.netrc)
      *   DEPLOY_ALLOW_ALL — set to "1" to disable all path restrictions
      */
     validateLocalPath(localPath) {
@@ -150,8 +151,14 @@ export class PagesMcpHttpClient {
                 throw new Error(`Path not allowed: ${localPath}. Allowed prefixes: ${allowPaths.join(", ")}`);
             return;
         }
-        const defaultBlocked = ["/etc", "/root/.ssh", "/var", "/usr", "/proc", "/sys", "/dev", "/boot", "/bin", "/sbin", "/lib", "/lib64"];
-        const blockPaths = (process.env.DEPLOY_BLOCK_PATHS || defaultBlocked.join(",")).split(",").map(p => p.trim()).filter(Boolean);
+        // Block sensitive directories under /root
+        const defaultRootBlocked = ["/root/.ssh", "/root/.gnupg", "/root/.aws", "/root/.docker", "/root/.kube", "/root/.config", "/root/.local", "/root/.npmrc", "/root/.netrc"];
+        // Use env var if explicitly set (even if empty), otherwise use default
+        const rootBlocked = process.env.DEPLOY_BLOCK_ROOT_DIRS !== undefined
+            ? process.env.DEPLOY_BLOCK_ROOT_DIRS.split(",").map(p => p.trim()).filter(Boolean)
+            : defaultRootBlocked;
+        const defaultBlocked = ["/etc", "/var", "/usr", "/proc", "/sys", "/dev", "/boot", "/bin", "/sbin", "/lib", "/lib64"];
+        const blockPaths = (process.env.DEPLOY_BLOCK_PATHS || defaultBlocked.join(",")).split(",").map(p => p.trim()).filter(Boolean).concat(rootBlocked);
         for (const prefix of blockPaths) {
             const resolvedPrefix = path.resolve(prefix);
             if (resolved.startsWith(resolvedPrefix + "/") || resolved === resolvedPrefix) {

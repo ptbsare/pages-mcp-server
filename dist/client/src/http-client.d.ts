@@ -14,7 +14,8 @@ export declare class PagesMcpHttpClient {
      * Validate local path before uploading.
      * Environment variables:
      *   DEPLOY_ALLOW_PATHS — comma-separated list of allowed path prefixes (e.g. "/home/user/projects,/tmp")
-     *   DEPLOY_BLOCK_PATHS — comma-separated list of blocked path prefixes (default: /etc,/root,/home,/var,/usr,/proc,/sys,/dev,/boot,/bin,/sbin,/lib,/lib64)
+     *   DEPLOY_BLOCK_PATHS — comma-separated list of blocked path prefixes (default: /etc,/var,/usr,/proc,/sys,/dev,/boot,/bin,/sbin,/lib,/lib64)
+     *   DEPLOY_BLOCK_ROOT_DIRS — comma-separated list of blocked dirs under /root (default: /root/.ssh,/root/.gnupg,/root/.aws,/root/.docker,/root/.kube,/root/.config,/root/.local,/root/.npmrc,/root/.netrc)
      *   DEPLOY_ALLOW_ALL — set to "1" to disable all path restrictions
      */
     private validateLocalPath;
