@@ -280,6 +280,7 @@ Optional TOTP-based two-factor authentication (Google Authenticator, Authy, etc.
 | `DB_PATH` | `~/.pages-mcp/pages.db` | SQLite database path |
 | `STORAGE_PATH` | `~/.pages-mcp/storage` | File storage path |
 | `SHARE_EXPIRE_DAYS` | `0` (disabled) | Auto-delete shares older than N days |
+| `STRICT_SHARE_CSP` | (disabled) | Set to `1` to enforce `script-src 'self'` on share pages. Default allows external scripts (`* 'unsafe-inline'`) |
 
 > **Note:** `AUTH_TOKEN` is only for initial seeding. Manage tokens via the admin dashboard after setup.
 
