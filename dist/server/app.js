@@ -222,11 +222,15 @@ export function createApp(config) {
             return;
         }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
-        // CSP for share pages: default allows external scripts (for CDN, polyfill, etc.)
+        // CSP for share pages: default allows everything (matching sub-resources)
         // Set STRICT_SHARE_CSP=1 to enforce strict same-origin only
         const strictCsp = process.env.STRICT_SHARE_CSP === "1";
-        const scriptSrc = strictCsp ? "'self'" : "* 'unsafe-inline'";
-        res.setHeader("Content-Security-Policy", `default-src 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-src 'none'; object-src 'none'`);
+        if (strictCsp) {
+            res.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'");
+        }
+        else {
+            res.setHeader("Content-Security-Policy", "default-src *; script-src *; style-src *; img-src *; font-src *; frame-src 'none'; object-src 'none'");
+        }
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "DENY");
         res.setHeader("Referrer-Policy", "no-referrer");
