@@ -232,7 +232,7 @@ export function createApp(config: ServerConfig) {
     if (strictCsp) {
       res.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'");
     } else {
-      res.setHeader("Content-Security-Policy", "default-src *; script-src *; style-src *; img-src *; font-src *; frame-src 'none'; object-src 'none'");
+      res.setHeader("Content-Security-Policy", "default-src *; script-src * 'unsafe-inline'; style-src * 'unsafe-inline'; img-src *; font-src *; frame-src 'none'; object-src 'none'");
     }
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
@@ -280,7 +280,7 @@ export function createApp(config: ServerConfig) {
     if (strictCspSub) {
       res.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'");
     } else {
-      res.setHeader("Content-Security-Policy", "default-src *; script-src *; style-src *; img-src *; font-src *; frame-src 'none'; object-src 'none'");
+      res.setHeader("Content-Security-Policy", "default-src *; script-src * 'unsafe-inline'; style-src * 'unsafe-inline'; img-src *; font-src *; frame-src 'none'; object-src 'none'");
     }
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
