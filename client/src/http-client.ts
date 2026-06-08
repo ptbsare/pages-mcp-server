@@ -60,12 +60,23 @@ export class PagesMcpHttpClient {
   async deployHtml(valueOrPath?: string, name?: string, description?: string, isPath?: boolean): Promise<string> {
     await this.initialize();
     let value: string | undefined = valueOrPath;
-    // If isPath is true, read the file
+    // If isPath is true, read and validate the file
     if (isPath && valueOrPath) {
+      // Validate path is allowed
+      this.validateLocalPath(valueOrPath);
       if (!fs.existsSync(valueOrPath)) {
         throw new Error(`File not found: ${valueOrPath}`);
       }
+      // Check file extension
+      const ext = path.extname(valueOrPath).toLowerCase();
+      if (ext !== ".html" && ext !== ".htm") {
+        throw new Error(`Invalid file type: ${ext}. Only .html and .htm files are allowed.`);
+      }
       value = fs.readFileSync(valueOrPath, "utf-8");
+      // Validate content contains HTML structure
+      if (!/<html[^>]*>/i.test(value)) {
+        throw new Error("File does not contain valid HTML (missing <html> tag).");
+      }
     }
     if (!value) {
       throw new Error("Missing required argument: value or path");
