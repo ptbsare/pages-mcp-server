@@ -304,7 +304,7 @@ export function createApp(config) {
      * - Also provides a plain ASCII filename= fallback for old clients.
      */
     function buildContentDisposition(filename) {
-        const safeAscii = filename.replace(/[\r\n"\\]/g, '_').replace(/[\x00-\x1f]/g, '');
+        const safeAscii = filename.replace(/[\r\n"\\]/g, '_').replace(/[\x00-\x1f]/g, '').replace(/[^\x20-\x7e]/g, '_');
         const encoded = encodeURIComponent(filename).replace(/['()]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
         return `attachment; filename="${safeAscii}"; filename*=UTF-8''${encoded}`;
     }
