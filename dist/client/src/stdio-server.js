@@ -92,7 +92,7 @@ export async function startStdioServer(remoteUrl, authToken) {
                 },
                 {
                     name: "deploy_file",
-                    description: "Share a local file or folder for file sharing (NOT for website deployment). For a single file, returns a direct download link. For a folder without index.html, returns a file listing page. Use deploy_html or deploy_folder to deploy websites.",
+                    description: "Share a local file or folder for file sharing (NOT for website deployment). For a single file, returns a direct download link. Use deploy_html or deploy_folder to deploy websites.",
                     inputSchema: {
                         type: "object",
                         properties: {

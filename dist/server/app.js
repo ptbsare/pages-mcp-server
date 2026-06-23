@@ -297,6 +297,17 @@ export function createApp(config) {
         res.sendFile(fullPath);
     });
     // ─── Security helpers ──────────────────────────────────
+    /**
+     * Build a safe Content-Disposition header value.
+     * - Non-ASCII characters (Chinese, emoji, etc.) are percent-encoded via RFC 5987
+     *   using the filename* parameter to avoid ERR_INVALID_CHAR crashes.
+     * - Also provides a plain ASCII filename= fallback for old clients.
+     */
+    function buildContentDisposition(filename) {
+        const safeAscii = filename.replace(/[\r\n"\\]/g, '_').replace(/[\x00-\x1f]/g, '');
+        const encoded = encodeURIComponent(filename).replace(/['()]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+        return `attachment; filename="${safeAscii}"; filename*=UTF-8''${encoded}`;
+    }
     const sanitizeFilename = (name) => name.replace(/[\r\n"\\]/g, '_').replace(/[\x00-\x1f]/g, '');
     // ─── File Share Routes ──────────────────────────────────
     const shareHtmlPath = path.join(path.dirname(new URL(import.meta.url).pathname), "public", "share.html");
@@ -400,7 +411,7 @@ export function createApp(config) {
         }
         if (meta.type === "file") {
             const filePath = path.join(config.storagePath, shareId, meta.fileName);
-            res.setHeader("Content-Disposition", `attachment; filename="${sanitizeFilename(meta.fileName)}"`);
+            res.setHeader("Content-Disposition", buildContentDisposition(meta.fileName));
             res.sendFile(filePath);
         }
         else {
@@ -421,7 +432,7 @@ export function createApp(config) {
             };
             addDir(pageDir, (meta.folderName || shareId) + "/");
             const zipName = sanitizeFilename((meta.folderName || shareId) + ".zip");
-            res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+            res.setHeader("Content-Disposition", buildContentDisposition(zipName));
             res.setHeader("Content-Type", "application/zip");
             res.send(zip.toBuffer());
         }
@@ -531,7 +542,7 @@ export function createApp(config) {
             else
                 zip.addFile(path.basename(filePath), fs.readFileSync(zipSource));
             const zipName = sanitizeFilename((filePath ? path.basename(filePath) : meta.folderName || shareId) + ".zip");
-            res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+            res.setHeader("Content-Disposition", buildContentDisposition(zipName));
             res.setHeader("Content-Type", "application/zip");
             res.send(zip.toBuffer());
         }
@@ -545,7 +556,7 @@ export function createApp(config) {
                 res.status(404).send("File not found");
                 return;
             }
-            res.setHeader("Content-Disposition", `attachment; filename="${sanitizeFilename(path.basename(filePath))}"`);
+            res.setHeader("Content-Disposition", buildContentDisposition(path.basename(filePath)));
             res.sendFile(resolvedFile);
         }
     });
@@ -664,7 +675,7 @@ export function createApp(config) {
                 zip.addFile(path.basename(filePath), fs.readFileSync(zipSource));
             }
             const zipName = (filePath ? path.basename(filePath) : meta.folderName || shareId) + ".zip";
-            res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+            res.setHeader("Content-Disposition", buildContentDisposition(zipName));
             res.setHeader("Content-Type", "application/zip");
             res.send(zip.toBuffer());
         }
@@ -679,7 +690,7 @@ export function createApp(config) {
                 res.status(404).send("File not found");
                 return;
             }
-            res.setHeader("Content-Disposition", `attachment; filename="${path.basename(filePath)}"`);
+            res.setHeader("Content-Disposition", buildContentDisposition(path.basename(filePath)));
             res.sendFile(resolvedFile);
         }
     });
