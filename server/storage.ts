@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
+const nanoid12 = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", 12);
+const nanoid = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
 import { Readable } from "stream";
 import { finished } from "stream/promises";
 import AdmZip from "adm-zip";
@@ -293,7 +295,7 @@ export class FileStorage {
     if (stat.size > MAX_SIZE) {
       throw new Error(`File too large (${stat.size} bytes). Max: ${MAX_SIZE} bytes`);
     }
-    const shareId = nanoid(12);
+    const shareId = nanoid12();
     const dir = this.getPageDir(shareId);
     fs.mkdirSync(dir, { recursive: true });
     const fileName = path.basename(filePath);
@@ -310,7 +312,7 @@ export class FileStorage {
     if (buffer.length > MAX_SIZE) {
       throw new Error(`File too large (${buffer.length} bytes). Max: ${MAX_SIZE} bytes`);
     }
-    const shareId = nanoid(12);
+    const shareId = nanoid12();
     const dir = this.getPageDir(shareId);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, fileName), buffer);
@@ -340,7 +342,7 @@ export class FileStorage {
     if (totalSize > MAX_SIZE) {
       throw new Error(`Folder too large (${totalSize} bytes). Max: ${MAX_SIZE} bytes`);
     }
-    const shareId = nanoid(12);
+    const shareId = nanoid12();
     const dir = this.getPageDir(shareId);
     fs.mkdirSync(dir, { recursive: true });
     // Copy folder contents preserving structure

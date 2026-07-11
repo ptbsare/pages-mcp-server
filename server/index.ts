@@ -4,7 +4,8 @@ import { createApp } from "./app.js";
 import { createMcpHandler } from "./mcp-endpoint.js";
 import rateLimit from "express-rate-limit";
 import { bearerAuth } from "./auth.js";
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
+const nanoid = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
 import type { ServerConfig } from "../shared/types.js";
 import { buildUrl } from "../shared/types.js";
 

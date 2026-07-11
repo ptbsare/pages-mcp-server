@@ -3,7 +3,9 @@ import { PagesDatabase } from "./db.js";
 import { FileStorage } from "./storage.js";
 import type { ServerConfig } from "../shared/types.js";
 import { buildUrl } from "../shared/types.js";
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
+const nanoid = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+const nanoid12 = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", 12);
 
 /** Trigger cleanup of expired shares/pages (non-blocking) */
 function triggerCleanup(storage: FileStorage, db: PagesDatabase) {
@@ -179,7 +181,7 @@ export function createMcpHandler(config: ServerConfig, db: PagesDatabase, storag
             return;
           }
 
-          const shareId = nanoid(12);
+          const shareId = nanoid12();
           const id = nanoid();
           const now = new Date().toISOString();
 

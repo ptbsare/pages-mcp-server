@@ -6,7 +6,9 @@ import mime from "mime-types";
 import path from "path";
 import fs from "fs";
 import { tmpdir } from "os";
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
+const nanoid = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+const nanoid12 = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", 12);
 import crypto from "crypto";
 import { PagesDatabase } from "./db.js";
 import { FileStorage } from "./storage.js";
@@ -20,6 +22,9 @@ import type {
   ErrorResponse,
 } from "../shared/types.js";
 import { buildUrl } from "../shared/types.js";
+
+// Valid shareId pattern: alphanumeric only, 1-64 chars
+const VALID_SHARE_ID = /^[a-zA-Z0-9]{1,64}$/;
 
 // ─── OTP helpers ────────────────────────────────────────────
 function generateOtpSecret(): string {
@@ -198,7 +203,7 @@ export function createApp(config: ServerConfig) {
   // Redirect to trailing slash so relative paths (./a.png) resolve correctly
   app.get("/s/:shareId", async (req: Request, res: Response) => {
     const { shareId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
+    if (!VALID_SHARE_ID.test(shareId)) {
       res.status(400).send("<h1>400 - Bad Request</h1>"); return;
     }
     // Always redirect to trailing slash for directory-style access
@@ -210,7 +215,7 @@ export function createApp(config: ServerConfig) {
 
   app.get("/s/:shareId/", async (req: Request, res: Response) => {
     const { shareId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
+    if (!VALID_SHARE_ID.test(shareId)) {
       res.status(400).send("<h1>400 - Bad Request</h1>"); return;
     }
     return serveStaticPage(req, res, shareId);
@@ -243,7 +248,7 @@ export function createApp(config: ServerConfig) {
 
   app.get("/s/:shareId/*", async (req: Request, res: Response) => {
     const { shareId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) {
+    if (!VALID_SHARE_ID.test(shareId)) {
       res.status(400).send("<h1>400 - Bad Request</h1>"); return;
     }
     const page = await db.getPageByShareId(shareId);
@@ -313,7 +318,7 @@ export function createApp(config: ServerConfig) {
   // List directory contents (JSON API)
   app.get("/f/:shareId/list", async (req: Request, res: Response) => {
     const { shareId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
+    if (!VALID_SHARE_ID.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
     const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).json({ error: "Not found" }); return; }
     const pageDir = path.join(config.storagePath, shareId);
@@ -340,7 +345,7 @@ export function createApp(config: ServerConfig) {
   // List subdirectory contents
   app.get("/f/:shareId/list/**", async (req: Request, res: Response) => {
     const { shareId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
+    if (!VALID_SHARE_ID.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
     const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).json({ error: "Not found" }); return; }
     const subPath = req.params[0] || "";
@@ -376,7 +381,7 @@ export function createApp(config: ServerConfig) {
   // Download file or zip
   app.get("/f/:shareId/raw", async (req: Request, res: Response) => {
     const { shareId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
+    if (!VALID_SHARE_ID.test(shareId)) { res.status(400).send("Bad Request"); return; }
     const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).send("Not found"); return; }
     if (meta.type === "file") {
@@ -432,7 +437,7 @@ export function createApp(config: ServerConfig) {
             throw new Error("Zip contains unsafe path");
           }
         }
-        const shareId = nanoid(12);
+        const shareId = nanoid12();
         const dir = path.join(config.storagePath, shareId);
         fs.mkdirSync(dir, { recursive: true });
         for (const entry of entries) {
@@ -469,7 +474,7 @@ export function createApp(config: ServerConfig) {
 
   app.get("/f/:shareId/raw/**", async (req: Request, res: Response) => {
     const { shareId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
+    if (!VALID_SHARE_ID.test(shareId)) { res.status(400).send("Bad Request"); return; }
     const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).send("Not found"); return; }
     const filePath = req.params[0] || "";
@@ -506,7 +511,7 @@ export function createApp(config: ServerConfig) {
   // Share page (must be LAST among /f/:shareId routes)
   app.get("/f/:shareId", async (req: Request, res: Response) => {
     const { shareId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
+    if (!VALID_SHARE_ID.test(shareId)) { res.status(400).send("Bad Request"); return; }
     const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).send("Not found"); return; }
     if (meta.type === "file") {
@@ -529,7 +534,7 @@ export function createApp(config: ServerConfig) {
   // List directory contents (JSON API for share page)
   app.get("/f/:shareId/list/**", async (req: Request, res: Response) => {
     const { shareId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
+    if (!VALID_SHARE_ID.test(shareId)) { res.status(400).json({ error: "Bad Request" }); return; }
     const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).json({ error: "Not found" }); return; }
     const subPath = req.params[0] || "";
@@ -565,7 +570,7 @@ export function createApp(config: ServerConfig) {
   // Download file or zip
   app.get("/f/:shareId/raw/**", async (req: Request, res: Response) => {
     const { shareId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(shareId)) { res.status(400).send("Bad Request"); return; }
+    if (!VALID_SHARE_ID.test(shareId)) { res.status(400).send("Bad Request"); return; }
     const meta = await storage.getShareMeta(shareId, db);
     if (!meta) { res.status(404).send("Not found"); return; }
     const filePath = req.params[0] || "";
@@ -614,7 +619,7 @@ export function createApp(config: ServerConfig) {
       if (!value || typeof value !== "string") {
         res.status(400).json({ error: "Missing or invalid 'value' field" } as ErrorResponse); return;
       }
-      const shareId = nanoid(12);
+      const shareId = nanoid12();
       const id = nanoid();
       const now = new Date().toISOString();
       storage.storeHtml(shareId, value);
@@ -635,7 +640,7 @@ export function createApp(config: ServerConfig) {
       if (!zipBase64 || typeof zipBase64 !== "string") {
         res.status(400).json({ error: "Missing or invalid 'zipBase64' field" } as ErrorResponse); return;
       }
-      const shareId = nanoid(12);
+      const shareId = nanoid12();
       const id = nanoid();
       const now = new Date().toISOString();
       const result = storage.storeZip(shareId, zipBase64);
